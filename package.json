@@ -1,0 +1,15 @@
+{
+  "name": "signal",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @signal/frontend & npm run dev -w @signal/backend",
+    "dev:frontend": "npm run dev -w @signal/frontend",
+    "dev:backend": "npm run dev -w @signal/backend",
+    "build": "npm run build -ws",
+    "typecheck": "npm run typecheck -ws"
+  }
+}

@@ -1,0 +1,2 @@
+ALTER TABLE signals
+ALTER COLUMN label DROP NOT NULL;

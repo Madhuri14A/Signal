@@ -1,0 +1,139 @@
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  color: #0f172a;
+  background: #f8fafc;
+}
+
+body {
+  margin: 0;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-container {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.app-title {
+  margin: 0 0 1rem;
+  font-size: 2rem;
+}
+
+.niche-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.pill {
+  border: 1px solid #cbd5e1;
+  background: white;
+  border-radius: 9999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  text-transform: capitalize;
+}
+
+.pill-selected {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: white;
+}
+
+.signals-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.signal-card {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1rem;
+}
+
+.signal-card-link {
+  text-decoration: none;
+  color: inherit;
+}
+
+.signal-card-link .signal-card {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.signal-card-link:hover .signal-card {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.signal-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.signal-meta-tags {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.signal-card-title {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.signal-badge {
+  white-space: nowrap;
+  font-size: 0.75rem;
+  border-radius: 9999px;
+  background: #fff7ed;
+  color: #c2410c;
+  padding: 0.2rem 0.6rem;
+}
+
+.signal-rising {
+  font-size: 0.75rem;
+  border-radius: 9999px;
+  background: #ecfeff;
+  color: #0e7490;
+  padding: 0.2rem 0.6rem;
+}
+
+.signal-niche-pill {
+  font-size: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1d4ed8;
+  padding: 0.2rem 0.6rem;
+  text-transform: capitalize;
+}
+
+.signal-card-summary {
+  margin: 0.55rem 0 0.8rem;
+  color: #334155;
+}
+
+.signal-articles-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.signal-article-link {
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+.signal-article-link:hover {
+  text-decoration: underline;
+}
