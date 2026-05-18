@@ -70,16 +70,15 @@ function parseLabelResponse(raw: string): LabelResponse {
 }
 
 function buildPrompt(articles: ArticleRow[]): string {
-  const lines = articles.map((article, index) => {
-    const snippet = (article.content ?? '').replace(/\s+/g, ' ').trim().slice(0, 320);
-    return `${index + 1}. Title: ${article.title}\n   Snippet: ${snippet || 'N/A'}`;
-  });
+  const titles = articles
+    .map((article, index) => `${index + 1}. ${article.title}`)
+    .join('\n');
 
   return [
-    'These articles are all discussing a related idea. In one short phrase (max 8 words), what is the common theme? Then in 2 sentences, summarize the signal. Respond in JSON: {label: string, summary: string}',
+    'Here are article titles from multiple sources this week:',
+    titles,
     '',
-    'Articles:',
-    ...lines,
+    'What single emerging idea connects them? Respond with a punchy 5-7 word label (title case, no jargon codes) and a 2 sentence summary. JSON: {label, summary}',
   ].join('\n');
 }
 

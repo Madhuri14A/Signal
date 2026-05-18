@@ -13,6 +13,7 @@ export type SignalArticle = {
   id: number;
   title: string;
   url: string;
+  image_url: string | null;
   source_name: string | null;
   published_at: string | null;
 };

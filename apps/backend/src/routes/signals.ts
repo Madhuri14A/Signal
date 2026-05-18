@@ -19,6 +19,7 @@ type SignalDetailRow = {
   article_id: number | null;
   title: string | null;
   url: string | null;
+  image_url: string | null;
   source_name: string | null;
   published_at: string | null;
 };
@@ -72,6 +73,7 @@ router.get('/signals/:id', async (req, res) => {
               a.id AS article_id,
               a.title,
               a.url,
+              a.image_url,
               src.name AS source_name,
               a.published_at
        FROM signals s
@@ -94,6 +96,7 @@ router.get('/signals/:id', async (req, res) => {
         id: row.article_id as number,
         title: row.title,
         url: row.url,
+        image_url: row.image_url,
         source_name: row.source_name,
         published_at: row.published_at,
       }));

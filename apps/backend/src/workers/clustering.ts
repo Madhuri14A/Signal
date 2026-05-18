@@ -4,7 +4,7 @@ type ArticleRow = {
   id: number;
 };
 
-const SIMILARITY_THRESHOLD = 0.82;
+const SIMILARITY_THRESHOLD = 0.65;
 const COSINE_DISTANCE_THRESHOLD = 1 - SIMILARITY_THRESHOLD;
 const MIN_CLUSTER_SIZE = 2;
 
@@ -61,6 +61,7 @@ async function fetchEmbeddedArticles(): Promise<ArticleRow[]> {
     `SELECT id
      FROM articles
      WHERE embedding IS NOT NULL
+       AND quality_score >= 2
      ORDER BY id ASC`
   );
 

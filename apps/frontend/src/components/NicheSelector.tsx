@@ -6,7 +6,10 @@ type NicheSelectorProps = {
 
 export default function NicheSelector({ niches, selectedNiche, onChange }: NicheSelectorProps) {
   return (
-    <section className="niche-selector" aria-label="Niche selector">
+    <section
+      className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      aria-label="Niche selector"
+    >
       {niches.map((niche) => {
         const selected = selectedNiche === niche;
 
@@ -14,7 +17,11 @@ export default function NicheSelector({ niches, selectedNiche, onChange }: Niche
           <button
             key={niche}
             type="button"
-            className={`pill ${selected ? 'pill-selected' : ''}`}
+            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium capitalize transition-all duration-200 ${
+              selected
+                ? 'bg-accent text-background'
+                : 'border-transparent bg-transparent text-muted hover:text-text'
+            }`}
             onClick={() => onChange(niche)}
           >
             {niche}
