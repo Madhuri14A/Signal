@@ -22,6 +22,7 @@
     "test:all": "npm run test:env && npm run test:db && npm run test:deps && npm run test:apis"
   },
   "dependencies": {
+    "@mozilla/readability": "^0.6.0",
     "axios": "^1.16.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.76.5",
@@ -30,16 +31,22 @@
     "dotenv": "^17.4.2",
     "express": "^4.19.2",
     "express-rate-limit": "^8.5.2",
+    "helmet": "^8.1.0",
+    "jsdom": "^29.1.1",
     "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.10.1",
     "node-cron": "^4.2.1",
     "openai": "^6.36.0",
     "pg": "^8.20.0",
-    "rss-parser": "^3.13.0"
+    "rss-parser": "^3.13.0",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
+    "@types/jsdom": "^28.0.3",
     "@types/jsonwebtoken": "^9.0.10",
+    "@types/morgan": "^1.9.10",
     "@types/node": "^22.5.0",
     "@types/node-cron": "^3.0.11",
     "@types/pg": "^8.20.0",

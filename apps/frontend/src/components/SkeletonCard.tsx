@@ -1,6 +1,6 @@
 export default function SkeletonCard() {
   return (
-    <div className="mx-auto w-full max-w-[680px] overflow-hidden rounded-2xl border border-border bg-card animate-pulse">
+    <div className="w-full overflow-hidden rounded-2xl border border-border bg-card animate-pulse">
       <div className="aspect-video w-full bg-input" />
       <div className="space-y-3 p-6">
         <div className="h-5 w-24 rounded bg-input" />

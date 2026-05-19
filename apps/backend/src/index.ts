@@ -1,6 +1,9 @@
 import dotenv from 'dotenv';
 import cors from 'cors';
 import express from 'express';
+import type { Server } from 'node:http';
+import helmet from 'helmet';
+import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { loadEnvOrExit } from './config/env';
 import { pool } from './db/index';
@@ -16,12 +19,17 @@ const env = loadEnvOrExit();
 
 const app = express();
 const PORT = env.PORT;
-const localOriginPattern = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+const FRONTEND_URL = env.FRONTEND_URL;
+const FRONTEND_ORIGIN = new URL(FRONTEND_URL).origin;
+let server: Server | null = null;
+
+app.use(helmet());
+app.use(morgan('combined'));
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || localOriginPattern.test(origin)) {
+      if (!origin || origin === FRONTEND_ORIGIN) {
         callback(null, true);
         return;
       }
@@ -75,12 +83,52 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
 
+app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  const statusCode =
+    typeof err === 'object' && err !== null && 'status' in err && typeof (err as { status?: unknown }).status === 'number'
+      ? ((err as { status: number }).status >= 400 ? (err as { status: number }).status : 500)
+      : 500;
+
+  console.error('Unhandled error:', err);
+  res.status(statusCode).json({ error: 'Something went wrong', code: statusCode });
+});
+
+async function gracefulShutdown(signal: string) {
+  console.log(`${signal} received. Starting graceful shutdown...`);
+
+  try {
+    if (server) {
+      await new Promise<void>((resolve, reject) => {
+        server?.close((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      });
+    }
+
+    await pool.end();
+    console.log('Shutdown complete');
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during graceful shutdown:', error);
+    process.exit(1);
+  }
+}
+
+process.on('SIGTERM', () => {
+  void gracefulShutdown('SIGTERM');
+});
+
 async function startServer() {
   try {
     await pool.query('SELECT 1');
     console.log('database connected');
 
-    app.listen(PORT, () => {
+    server = app.listen(PORT, () => {
       console.log(`signal backend running on http://localhost:${PORT}`);
     });
   } catch (error) {

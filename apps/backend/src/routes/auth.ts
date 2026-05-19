@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
 import { query } from '../db';
 import { authMiddleware } from '../middleware/auth';
 
@@ -14,6 +15,18 @@ type UserRow = {
 };
 
 const router = Router();
+
+const registerSchema = z.object({
+  name: z.string().trim().min(1, 'name is required'),
+  email: z.string().trim().email('email must be valid'),
+  password: z.string().min(8, 'password must be at least 8 characters'),
+  niche: z.string().trim().optional(),
+});
+
+const loginSchema = z.object({
+  email: z.string().trim().email('email must be valid'),
+  password: z.string().min(8, 'password must be at least 8 characters'),
+});
 
 function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
@@ -38,16 +51,15 @@ function signToken(user: Pick<UserRow, 'id' | 'email'>): string {
 }
 
 router.post('/auth/register', async (req, res) => {
-  const { name, email, password, niche } = req.body as {
-    name?: string;
-    email?: string;
-    password?: string;
-    niche?: string;
-  };
-
-  if (!name || !email || !password) {
-    return res.status(400).json({ message: 'name, email, and password are required' });
+  const parsed = registerSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: 'Invalid request body',
+      issues: parsed.error.issues,
+    });
   }
+
+  const { name, email, password, niche } = parsed.data;
 
   try {
     const existing = await query<{ id: number }>('SELECT id FROM users WHERE email = $1', [email]);
@@ -86,11 +98,15 @@ router.post('/auth/register', async (req, res) => {
 });
 
 router.post('/auth/login', async (req, res) => {
-  const { email, password } = req.body as { email?: string; password?: string };
-
-  if (!email || !password) {
-    return res.status(400).json({ message: 'email and password are required' });
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({
+      message: 'Invalid request body',
+      issues: parsed.error.issues,
+    });
   }
+
+  const { email, password } = parsed.data;
 
   try {
     const result = await query<UserRow>(

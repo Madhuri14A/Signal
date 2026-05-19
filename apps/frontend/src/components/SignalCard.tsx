@@ -83,7 +83,7 @@ export default function SignalCard({
   const timestamp = formatRelativeTime(createdAt);
 
   return (
-    <article className="group relative mx-auto w-full max-w-[680px] overflow-hidden rounded-2xl border border-border bg-card shadow-[0_14px_36px_rgba(0,0,0,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_56px_rgba(0,0,0,0.34)]">
+    <article className="group relative w-full overflow-hidden rounded-2xl border border-border bg-card shadow-[0_14px_36px_rgba(0,0,0,0.22)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_56px_rgba(0,0,0,0.34)]">
       <span
         className={`absolute inset-y-0 left-0 z-10 w-1 transition-colors duration-300 ${palette.leftAccent} ${palette.leftAccentHover}`}
         aria-hidden="true"

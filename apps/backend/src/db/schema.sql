@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS articles (
   content TEXT,
   image_url TEXT,
   quality_score INTEGER NOT NULL DEFAULT 0,
+  word_count INTEGER NOT NULL DEFAULT 0,
   published_at TIMESTAMPTZ,
   embedding VECTOR(1536)
 );

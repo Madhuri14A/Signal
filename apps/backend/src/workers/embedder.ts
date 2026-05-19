@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
 import axios from 'axios';
+import fs from 'node:fs/promises';
+import path from 'node:path';
 import { pool, query } from '../db';
 
 dotenv.config();
@@ -10,7 +12,14 @@ type ArticleRow = {
   content: string | null;
 };
 
-const BATCH_SIZE = 100;
+type EmbedderCheckpoint = {
+  lastProcessedArticleId: number;
+};
+
+const BATCH_SIZE = 20;
+const BATCH_DELAY_MS = 2000;
+const MIN_WORD_COUNT = 500;
+const CHECKPOINT_FILE = path.resolve(process.cwd(), 'embedder-checkpoint.json');
 const PRIMARY_GEMINI_MODEL = process.env.GEMINI_EMBED_MODEL || 'models/gemini-embedding-001';
 const FALLBACK_GEMINI_MODEL = 'models/text-embedding-004';
 const USE_LOCAL_EMBEDDINGS = process.env.LOCAL_EMBEDDINGS === 'true';
@@ -167,14 +176,44 @@ async function createGeminiEmbedding(apiKey: string, input: string): Promise<num
   throw new Error(`Gemini embedding model not found. Tried: ${modelsToTry.join(', ')}`);
 }
 
-async function fetchArticlesWithoutEmbedding(limit: number): Promise<ArticleRow[]> {
+async function readCheckpoint(): Promise<number> {
+  try {
+    const raw = await fs.readFile(CHECKPOINT_FILE, 'utf8');
+    const parsed = JSON.parse(raw) as Partial<EmbedderCheckpoint>;
+    const checkpointId = Number(parsed.lastProcessedArticleId);
+
+    if (!Number.isFinite(checkpointId) || checkpointId < 0) {
+      return 0;
+    }
+
+    return checkpointId;
+  } catch {
+    return 0;
+  }
+}
+
+async function writeCheckpoint(lastProcessedArticleId: number): Promise<void> {
+  await fs.writeFile(
+    CHECKPOINT_FILE,
+    JSON.stringify({ lastProcessedArticleId } satisfies EmbedderCheckpoint, null, 2),
+    'utf8'
+  );
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function fetchArticlesWithoutEmbedding(limit: number, startAfterId: number): Promise<ArticleRow[]> {
   const result = await query<ArticleRow>(
     `SELECT id, title, content
      FROM articles
      WHERE embedding IS NULL
+       AND word_count >= $2
+       AND id > $3
      ORDER BY id ASC
      LIMIT $1`,
-    [limit]
+    [limit, MIN_WORD_COUNT, startAfterId]
   );
 
   return result.rows;
@@ -198,7 +237,11 @@ export async function runEmbedder() {
   }
 
   const targetVectorLength = await getEmbeddingColumnDimension();
+  let checkpointId = await readCheckpoint();
+
   console.log(`embedding target dimension: ${targetVectorLength}`);
+  console.log(`embedding filter: word_count >= ${MIN_WORD_COUNT}`);
+  console.log(`resuming from checkpoint article id: ${checkpointId}`);
   if (USE_LOCAL_EMBEDDINGS) {
     console.log('local embedding mode enabled (no billing/API calls)');
   }
@@ -208,7 +251,7 @@ export async function runEmbedder() {
   let shouldStop = false;
 
   while (true) {
-    const batch = await fetchArticlesWithoutEmbedding(BATCH_SIZE);
+    const batch = await fetchArticlesWithoutEmbedding(BATCH_SIZE, checkpointId);
     if (batch.length === 0) {
       break;
     }
@@ -235,6 +278,8 @@ export async function runEmbedder() {
           : normalizeVectorLength(await createGeminiEmbedding(apiKey as string, input), targetVectorLength);
 
         await updateArticleEmbedding(article.id, embedding);
+        checkpointId = article.id;
+        await writeCheckpoint(checkpointId);
         totalEmbedded += 1;
 
         console.log(
@@ -265,6 +310,9 @@ export async function runEmbedder() {
     if (shouldStop) {
       break;
     }
+
+    console.log(`batch ${batchNumber} complete. waiting ${BATCH_DELAY_MS / 1000}s...`);
+    await delay(BATCH_DELAY_MS);
   }
 
   console.log(`embedding complete: ${totalEmbedded} articles updated`);

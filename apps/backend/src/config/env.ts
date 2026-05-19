@@ -1,5 +1,6 @@
 type AppEnv = {
   PORT: number;
+  FRONTEND_URL: string;
   DATABASE_URL: string;
   OPENAI_API_KEY?: string;
   GEMINI_API_KEY?: string;
@@ -8,7 +9,7 @@ type AppEnv = {
 };
 
 export function loadEnvOrExit(): AppEnv {
-  const requiredVars = ['PORT', 'DATABASE_URL', 'UPSTASH_REDIS_URL', 'JWT_SECRET'] as const;
+  const requiredVars = ['PORT', 'FRONTEND_URL', 'DATABASE_URL', 'UPSTASH_REDIS_URL', 'JWT_SECRET'] as const;
   const missing: string[] = [];
 
   for (const name of requiredVars) {
@@ -41,6 +42,7 @@ export function loadEnvOrExit(): AppEnv {
 
   return {
     PORT: parsedPort,
+    FRONTEND_URL: process.env.FRONTEND_URL as string,
     DATABASE_URL: process.env.DATABASE_URL as string,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     GEMINI_API_KEY: process.env.GEMINI_API_KEY,

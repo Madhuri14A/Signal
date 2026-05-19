@@ -243,7 +243,7 @@ function SignalFeedPage() {
       </div>
 
       {isLoading && (
-        <section className="mx-auto flex w-full max-w-[680px] flex-col gap-6">
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
@@ -258,7 +258,7 @@ function SignalFeedPage() {
       )}
 
       {!isLoading && !isError && activeListCount > 0 && (
-        <section className="mx-auto flex w-full max-w-[680px] flex-col gap-6">
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
           {showingSaved
             ? displaySavedSignals.map((signal) => {
                 const detail = detailById.get(signal.id);

@@ -34,8 +34,25 @@ type SourceRow = {
 
 const router = Router();
 
-router.get('/signals', async (_req, res) => {
+function toPositiveInt(value: unknown, fallback: number): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+
+  return Math.floor(parsed);
+}
+
+router.get('/signals', async (req, res) => {
+  const page = toPositiveInt(req.query.page, 1);
+  const limit = Math.min(toPositiveInt(req.query.limit, 20), 100);
+  const offset = (page - 1) * limit;
+
   try {
+    const totalResult = await query<{ count: string }>('SELECT COUNT(*)::text AS count FROM signals');
+    const totalItems = Number(totalResult.rows[0]?.count ?? 0);
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit));
+
     const result = await query<SignalRow>(
       `SELECT id,
               label,
@@ -44,10 +61,21 @@ router.get('/signals', async (_req, res) => {
               created_at,
               COALESCE(array_length(article_ids, 1), 0)::int AS article_count
        FROM signals
-        ORDER BY velocity DESC, created_at DESC, id DESC`
+        ORDER BY velocity DESC, created_at DESC, id DESC
+       LIMIT $1
+      OFFSET $2`,
+      [limit, offset]
     );
 
-    res.json({ items: result.rows });
+    res.json({
+      items: result.rows,
+      pagination: {
+        page,
+        limit,
+        totalItems,
+        totalPages,
+      },
+    });
   } catch (error) {
     res.status(500).json({
       message: 'Failed to fetch signals',

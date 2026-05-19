@@ -1,3 +1,6 @@
+import axios from 'axios';
+import { Readability } from '@mozilla/readability';
+import { JSDOM } from 'jsdom';
 import Parser from 'rss-parser';
 import { pool, query } from '../db';
 
@@ -24,9 +27,9 @@ type FeedItem = {
 
 const parser = new Parser<Record<string, never>, FeedItem>();
 const FRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const MIN_CONTENT_LENGTH = 300;
+const MIN_WORD_COUNT = 500;
 
-const NOISE_TITLE_PATTERN = /\b(release|changelog|fix|bug|hotfix|patch|update|v0\.|v1\.|v0|v1)\b/i;
+const NOISE_TITLE_PATTERN = /\b(release|v\d+\.|changelog|fix|bug|patch)\b/i;
 const THOUGHTFUL_TITLE_PATTERN = /\b(why|how|future|thoughts|notes on|essay)\b/i;
 
 async function fetchSources() {
@@ -109,24 +112,71 @@ function isFreshArticle(item: FeedItem): boolean {
   return Date.now() - publishedAtMs <= FRESH_WINDOW_MS;
 }
 
-function normalizeContent(item: FeedItem): string {
-  const raw = item.content ?? item.summary ?? item.contentSnippet ?? '';
-  const withoutTags = raw
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' ');
+function normalizeText(raw: string): string {
+  return raw.replace(/\s+/g, ' ').trim();
+}
 
-  return withoutTags.replace(/\s+/g, ' ').trim();
+function countWords(text: string): number {
+  if (!text) {
+    return 0;
+  }
+
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+function extractImageFromReadableHtml(html: string | null): string | null {
+  if (!html) {
+    return null;
+  }
+
+  const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+  return match?.[1]?.trim() || null;
+}
+
+async function fetchReadableArticle(url: string): Promise<{
+  content: string;
+  wordCount: number;
+  imageUrl: string | null;
+} | null> {
+  try {
+    const response = await axios.get<string>(url, {
+      timeout: 15000,
+      responseType: 'text',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Accept: 'text/html,application/xhtml+xml',
+      },
+    });
+
+    const dom = new JSDOM(response.data, { url });
+    const readable = new Readability(dom.window.document).parse();
+    if (!readable?.textContent) {
+      return null;
+    }
+
+    const normalizedContent = normalizeText(readable.textContent);
+    const wordCount = countWords(normalizedContent);
+    const imageUrl = extractImageFromReadableHtml(readable.content ?? null);
+
+    return {
+      content: normalizedContent,
+      wordCount,
+      imageUrl,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function shouldSkipByTitle(title: string): boolean {
   return NOISE_TITLE_PATTERN.test(title);
 }
 
-function calculateQualityScore(title: string, contentLength: number): number {
+function calculateQualityScore(title: string, wordCount: number): number {
   let score = 0;
 
-  if (contentLength > 1000) {
+  if (wordCount > 1000) {
     score += 3;
   }
 
@@ -144,11 +194,7 @@ function calculateQualityScore(title: string, contentLength: number): number {
 async function insertArticle(sourceId: number, item: FeedItem) {
   const title = item.title?.trim();
   const url = item.link?.trim();
-  const normalizedContent = normalizeContent(item);
-  const content = normalizedContent || null;
-  const contentLength = normalizedContent.length;
   const publishedAt = item.isoDate ?? item.pubDate ?? null;
-  const imageUrl = extractImageUrl(item);
 
   if (!title || !url) {
     return false;
@@ -162,17 +208,24 @@ async function insertArticle(sourceId: number, item: FeedItem) {
     return false;
   }
 
-  if (contentLength <= MIN_CONTENT_LENGTH) {
+  const readableArticle = await fetchReadableArticle(url);
+  if (!readableArticle) {
     return false;
   }
 
-  const qualityScore = calculateQualityScore(title, contentLength);
+  if (readableArticle.wordCount < MIN_WORD_COUNT) {
+    return false;
+  }
+
+  const content = readableArticle.content;
+  const imageUrl = extractImageUrl(item) ?? readableArticle.imageUrl;
+  const qualityScore = calculateQualityScore(title, readableArticle.wordCount);
 
   const result = await query(
-    `INSERT INTO articles (source_id, title, url, content, image_url, quality_score, published_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    `INSERT INTO articles (source_id, title, url, content, image_url, quality_score, word_count, published_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      ON CONFLICT (url) DO NOTHING`,
-    [sourceId, title, url, content, imageUrl, qualityScore, publishedAt]
+    [sourceId, title, url, content, imageUrl, qualityScore, readableArticle.wordCount, publishedAt]
   );
 
   return (result.rowCount ?? 0) > 0;
