@@ -30,11 +30,30 @@ export default function Login() {
       login({ token: data.token, user: data.user });
       navigate('/');
     } catch (submitError) {
-      setError(
-        submitError instanceof Error
-          ? submitError.message
-          : 'Login failed. Please try again.'
-      );
+      let errorMsg = 'Login failed. Please try again.';
+
+      if (submitError instanceof Error) {
+        if (submitError.message.includes('timeout') || submitError.message.includes('Timeout')) {
+          errorMsg = 'Request timed out. Backend server may be down. Try again in a moment.';
+        } else if (submitError.message.includes('ECONNREFUSED')) {
+          errorMsg = 'Cannot connect to backend server. Make sure it is running on port 4000.';
+        } else if (submitError.message.includes('Network')) {
+          errorMsg = `Network error: ${submitError.message}`;
+        } else {
+          errorMsg = submitError.message;
+        }
+      } else if (typeof submitError === 'object' && submitError !== null) {
+        const err = submitError as any;
+        if (err.response?.data?.message) {
+          errorMsg = err.response.data.message;
+        } else if (err.response?.data?.error) {
+          errorMsg = err.response.data.error;
+        } else if (err.message) {
+          errorMsg = err.message;
+        }
+      }
+
+      setError(errorMsg);
     } finally {
       setLoading(false);
     }

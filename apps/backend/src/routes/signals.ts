@@ -49,7 +49,7 @@ router.get('/signals', async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const totalResult = await query<{ count: string }>('SELECT COUNT(*)::text AS count FROM signals');
+    const totalResult = await query<{ count: string }>('SELECT COUNT(*)::text AS count FROM signals WHERE status = \'active\'');
     const totalItems = Number(totalResult.rows[0]?.count ?? 0);
     const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
@@ -57,13 +57,14 @@ router.get('/signals', async (req, res) => {
       `SELECT id,
               label,
               summary,
-          velocity,
+              velocity,
               created_at,
               COALESCE(array_length(article_ids, 1), 0)::int AS article_count
        FROM signals
-        ORDER BY velocity DESC, created_at DESC, id DESC
+       WHERE status = 'active'
+       ORDER BY velocity DESC, created_at DESC, id DESC
        LIMIT $1
-      OFFSET $2`,
+       OFFSET $2`,
       [limit, offset]
     );
 

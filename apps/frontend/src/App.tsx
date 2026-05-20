@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { motion } from 'framer-motion';
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import EmptyState from './components/EmptyState';
@@ -17,7 +18,7 @@ import Profile from './pages/Profile';
 import Register from './pages/Register';
 import SignalDetail from './pages/SignalDetail';
 
-const NICHES = ['all', 'startup', 'ai', 'fullstack', 'artist', 'philosophy', 'editorial'] as const;
+const NICHE_ORDER = ['all', 'ai', 'webdev', 'devtools', 'startup', 'security', 'data'] as const;
 
 function signalMatchesNiche(
   signal: SignalDetailData,
@@ -83,6 +84,15 @@ function SignalFeedPage() {
     }
 
     return map;
+  }, [sourcesQuery.data]);
+
+  const niches = useMemo(() => {
+    const available = new Set(Object.keys(sourcesQuery.data ?? {}));
+    const ordered = NICHE_ORDER.filter((niche) => niche === 'all' || available.has(niche));
+    const orderedSet = new Set<string>(ordered);
+    const extras = [...available].filter((niche) => !orderedSet.has(niche)).sort();
+
+    return [...ordered, ...extras];
   }, [sourcesQuery.data]);
 
   const details = useMemo(
@@ -200,51 +210,46 @@ function SignalFeedPage() {
   const activeListCount = showingSaved ? displaySavedSignals.length : displaySignals.length;
 
   return (
-    <Layout niches={[...NICHES]} selectedNiche={selectedNiche} onChangeNiche={setSelectedNiche}>
-      <div className="mb-6 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-card p-1.5">
-        <button
-          type="button"
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            activeTab === 'all'
-              ? 'bg-accent text-background'
-              : 'text-muted hover:bg-input hover:text-text'
-          }`}
-          onClick={() => setActiveTab('all')}
-        >
-          All
-        </button>
-        <button
-          type="button"
-          className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-            activeTab === 'saved'
-              ? 'bg-accent text-background'
-              : 'text-muted hover:bg-input hover:text-text'
-          }`}
-          onClick={() => setActiveTab('saved')}
-        >
-          Saved
-        </button>
+    <Layout niches={niches} selectedNiche={selectedNiche} onChangeNiche={setSelectedNiche}>
+      <div className="mb-6 flex items-center gap-6">
+        {(['all', 'saved'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className="relative pb-1 text-sm font-medium capitalize transition-colors"
+            style={{ color: activeTab === tab ? 'var(--color-text)' : 'var(--color-muted)' }}
+          >
+            {tab}
+            {activeTab === tab && (
+              <motion.span
+                layoutId="feed-tab-underline"
+                className="absolute bottom-0 left-0 right-0 h-px bg-accent"
+                transition={{ type: 'spring', stiffness: 500, damping: 40 }}
+              />
+            )}
+          </button>
+        ))}
       </div>
 
-      <div className="mb-6">
+      <div className="mb-5">
         <input
           type="text"
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Search by label or summary..."
-          className="w-full rounded-2xl border border-border bg-input px-4 py-3 text-text placeholder:text-muted outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20"
+          placeholder="Search signals..."
+          className="w-full rounded-lg border border-border bg-input px-4 py-2.5 text-sm text-text placeholder:text-muted outline-none transition focus:border-border focus:ring-1 focus:ring-border"
           aria-label="Search signals"
         />
       </div>
 
-      <div className="mb-8">
-        <p className="text-sm font-light uppercase tracking-[0.2em] text-muted">Signals detected this week</p>
-        <p className="mt-2 text-4xl font-semibold text-muted/80 sm:text-5xl">{activeListCount}</p>
+      <div className="mb-6">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Signals this week</p>
+        <p className="mt-1 text-3xl font-semibold text-text">{activeListCount}</p>
       </div>
 
       {isLoading && (
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SkeletonCard />
+        <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <SkeletonCard />
           <SkeletonCard />
           <SkeletonCard />
@@ -258,7 +263,12 @@ function SignalFeedPage() {
       )}
 
       {!isLoading && !isError && activeListCount > 0 && (
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <motion.section
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+          initial="hidden"
+          animate="visible"
+          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+        >
           {showingSaved
             ? displaySavedSignals.map((signal) => {
                 const detail = detailById.get(signal.id);
@@ -274,8 +284,12 @@ function SignalFeedPage() {
                 const imageUrl = detail?.articles.find((article) => article.image_url)?.image_url;
 
                 return (
-                  <SignalCard
+                  <motion.div
                     key={signal.id}
+                    variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                  >
+                  <SignalCard
                     id={signal.id}
                     label={signal.label}
                     summary={signal.summary}
@@ -289,6 +303,7 @@ function SignalFeedPage() {
                     bookmarkLoading={toggleBookmarkMutation.isPending}
                     onToggleBookmark={handleToggleBookmark}
                   />
+                  </motion.div>
                 );
               })
             : displaySignals.map((signal) => {
@@ -307,8 +322,12 @@ function SignalFeedPage() {
                 const imageUrl = signal.articles.find((article) => article.image_url)?.image_url;
 
                 return (
-                  <SignalCard
+                  <motion.div
                     key={signal.id}
+                    variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+                    transition={{ duration: 0.22, ease: 'easeOut' }}
+                  >
+                  <SignalCard
                     id={signal.id}
                     label={signal.label}
                     summary={signal.summary}
@@ -322,9 +341,10 @@ function SignalFeedPage() {
                     bookmarkLoading={toggleBookmarkMutation.isPending}
                     onToggleBookmark={handleToggleBookmark}
                   />
+                  </motion.div>
                 );
               })}
-        </section>
+        </motion.section>
       )}
     </Layout>
   );

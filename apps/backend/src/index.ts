@@ -26,18 +26,10 @@ let server: Server | null = null;
 app.use(helmet());
 app.use(morgan('combined'));
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin || origin === FRONTEND_ORIGIN) {
-        callback(null, true);
-        return;
-      }
-
-      callback(new Error('Not allowed by CORS'));
-    },
-  })
-);
+app.use(cors({
+  origin: FRONTEND_ORIGIN,
+  credentials: true,
+}));
 
 const generalApiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,

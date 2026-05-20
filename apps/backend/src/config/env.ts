@@ -18,12 +18,6 @@ export function loadEnvOrExit(): AppEnv {
     }
   }
 
-  const hasOpenAi = Boolean(process.env.OPENAI_API_KEY?.trim());
-  const hasGemini = Boolean(process.env.GEMINI_API_KEY?.trim());
-  if (!hasOpenAi && !hasGemini) {
-    missing.push('OPENAI_API_KEY or GEMINI_API_KEY');
-  }
-
   const rawPort = process.env.PORT;
   const parsedPort = Number(rawPort);
   if (!rawPort || !Number.isFinite(parsedPort) || parsedPort <= 0) {

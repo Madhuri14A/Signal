@@ -1,3 +1,5 @@
+import { motion } from 'framer-motion';
+
 type NicheSelectorProps = {
   niches: string[];
   selectedNiche: string;
@@ -6,28 +8,31 @@ type NicheSelectorProps = {
 
 export default function NicheSelector({ niches, selectedNiche, onChange }: NicheSelectorProps) {
   return (
-    <section
-      className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      aria-label="Niche selector"
+    <nav
+      className="flex gap-1 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      aria-label="Filter by niche"
     >
       {niches.map((niche) => {
         const selected = selectedNiche === niche;
-
         return (
           <button
             key={niche}
             type="button"
-            className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium capitalize transition-all duration-200 ${
-              selected
-                ? 'bg-accent text-background'
-                : 'border-transparent bg-transparent text-muted hover:text-text'
-            }`}
             onClick={() => onChange(niche)}
+            className="relative whitespace-nowrap rounded-md px-3.5 py-1.5 text-[13px] font-medium capitalize transition-colors duration-150"
+            style={{ color: selected ? 'var(--color-text)' : 'var(--color-muted)' }}
           >
-            {niche}
+            {selected && (
+              <motion.span
+                layoutId="niche-pill"
+                className="absolute inset-0 rounded-md bg-card border border-border"
+                transition={{ type: 'spring', stiffness: 400, damping: 35 }}
+              />
+            )}
+            <span className="relative z-10">{niche}</span>
           </button>
         );
       })}
-    </section>
+    </nav>
   );
 }

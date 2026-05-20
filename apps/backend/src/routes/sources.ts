@@ -17,7 +17,16 @@ router.get('/', async (_req, res) => {
       'SELECT id, name, url, niche, created_at FROM sources ORDER BY created_at DESC'
     );
 
-    res.json({ items: result.rows });
+    const grouped = result.rows.reduce<Record<string, SourceRow[]>>((acc, row) => {
+      const key = row.niche?.trim().toLowerCase() || 'general';
+      if (!acc[key]) {
+        acc[key] = [];
+      }
+      acc[key].push(row);
+      return acc;
+    }, {});
+
+    res.json({ items: grouped });
   } catch (error) {
     res.status(500).json({
       message: 'Failed to fetch sources',

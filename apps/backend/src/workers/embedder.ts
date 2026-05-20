@@ -94,11 +94,27 @@ function seededRandom(seed: number): () => number {
 }
 
 function createLocalEmbedding(input: string, dimension: number): number[] {
-  const rand = seededRandom(stringToSeed(input));
-  const values = new Array<number>(dimension);
+  const tokens = input
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((t) => t.length > 2)
+    .slice(0, 500);
 
-  for (let i = 0; i < dimension; i += 1) {
-    values[i] = rand() * 2 - 1;
+  const values = new Array<number>(dimension).fill(0);
+
+  if (tokens.length === 0) {
+    const rand = seededRandom(stringToSeed(input));
+    for (let i = 0; i < dimension; i += 1) {
+      values[i] = rand() * 2 - 1;
+    }
+  } else {
+    for (const token of tokens) {
+      const rand = seededRandom(stringToSeed(token));
+      for (let i = 0; i < dimension; i += 1) {
+        values[i] += rand() * 2 - 1;
+      }
+    }
   }
 
   let norm = 0;
