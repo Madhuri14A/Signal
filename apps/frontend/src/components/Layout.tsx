@@ -43,13 +43,18 @@ export default function Layout({ children, niches, selectedNiche, onChangeNiche 
   return (
     <main className="min-h-screen bg-background text-text">
       <header className="sticky top-0 z-20 border-b border-border/60 bg-background/96 backdrop-blur-xl">
-        <div className="mx-auto flex w-full max-w-7xl items-center gap-6 px-4 py-3.5 sm:px-6 lg:px-8">
-          <Link to="/" className="flex items-center gap-2.5 leading-none text-text shrink-0" aria-label="Signal home">
-            <span
-              className="h-2 w-2 rounded-full bg-accent"
-              style={{ boxShadow: '0 0 0 5px rgba(163,230,53,0.10)' }}
-            />
-            <span className="text-[17px] font-semibold tracking-tight">Signal</span>
+        <div className="mx-auto flex w-full max-w-7xl items-center gap-6 px-4 py-4 sm:px-6 lg:px-8">
+          <Link to="/" className="flex flex-col leading-none text-text shrink-0" aria-label="Signal home">
+            <span className="flex items-center gap-2 text-3xl font-bold tracking-tight sm:text-4xl">
+              <span>Signal</span>
+              <span
+                className="h-2.5 w-2.5 rounded-full bg-accent shadow-[0_0_0_6px_rgba(163,230,53,0.12)] animate-pulse"
+                style={{ animationDuration: '2s' }}
+              />
+            </span>
+            <span className="mt-2 text-xs font-normal text-muted sm:text-sm">
+              What sharp minds are converging on
+            </span>
           </Link>
 
           <div className="hidden flex-1 justify-center md:flex">

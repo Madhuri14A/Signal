@@ -19,7 +19,8 @@
     "test:deps": "npx tsx tests/dependencies.test.ts",
     "test:env": "npx tsx tests/env-check.test.ts",
     "test:apis": "npx tsx tests/external-apis.test.ts",
-    "test:all": "npm run test:env && npm run test:db && npm run test:deps && npm run test:apis"
+    "test:unit": "npx tsx --test tests/vector-math.test.ts",
+    "test:all": "npm run test:env && npm run test:db && npm run test:deps && npm run test:unit && npm run test:apis"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",

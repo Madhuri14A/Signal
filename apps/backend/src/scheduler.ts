@@ -1,4 +1,5 @@
 import cron from 'node-cron';
+import { logWorkerRun } from './db/workerLogs';
 import { runClustering } from './workers/clustering';
 import { runEmbedder } from './workers/embedder';
 import { runLabeler } from './workers/labeler';
@@ -18,14 +19,34 @@ async function runJob(job: Job) {
   }
 
   running.add(job.name);
+  const startedAt = new Date();
   const start = Date.now();
 
   try {
     console.log(`[scheduler] start ${job.name}`);
     await job.task();
     const ms = Date.now() - start;
+    const finishedAt = new Date();
+    await logWorkerRun({
+      workerName: job.name,
+      status: 'success',
+      startedAt,
+      finishedAt,
+      durationMs: ms,
+      message: null,
+    });
     console.log(`[scheduler] done ${job.name} in ${Math.round(ms / 1000)}s`);
   } catch (error) {
+    const ms = Date.now() - start;
+    const finishedAt = new Date();
+    await logWorkerRun({
+      workerName: job.name,
+      status: 'failure',
+      startedAt,
+      finishedAt,
+      durationMs: ms,
+      message: error instanceof Error ? error.message : String(error),
+    });
     console.error(
       `[scheduler] failed ${job.name}`,
       error instanceof Error ? error.message : error

@@ -14,6 +14,15 @@ const FALLBACK_MODELS = ['models/gemini-1.5-flash-latest', 'models/gemini-2.0-fl
 
 const router = Router();
 
+function fallbackCounterargument(label: string, summary: string): string {
+  const shortSummary = summary.slice(0, 220);
+  return [
+    `A counterpoint to "${label}" is that early momentum can be noisy and not always durable demand.`,
+    `Signals often overrepresent highly online sources, so adoption in real teams may lag behind headlines.`,
+    `Before acting, validate this trend with your own constraints, costs, and measurable outcomes. ${shortSummary ? `Context: ${shortSummary}` : ''}`,
+  ].join(' ');
+}
+
 async function generateCounterargument(apiKey: string, label: string, summary: string): Promise<string> {
   const prompt = `The following idea is gaining traction: ${label}. ${summary}. Write the strongest possible counterargument in 3 sentences. Be direct, not preachy.`;
   const modelsToTry = [PRIMARY_MODEL, ...FALLBACK_MODELS];
@@ -67,11 +76,6 @@ router.post('/blindspot', authMiddleware, async (req, res) => {
     return res.status(400).json({ message: 'signalId must be a positive integer' });
   }
 
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    return res.status(500).json({ message: 'GEMINI_API_KEY is required' });
-  }
-
   try {
     const result = await query<SignalRow>(
       `SELECT id, label, summary
@@ -88,12 +92,32 @@ router.post('/blindspot', authMiddleware, async (req, res) => {
 
     const label = signal.label?.trim() || 'Untitled signal';
     const summary = signal.summary?.trim() || 'No summary provided.';
-    const counterargument = await generateCounterargument(apiKey, label, summary);
+    const apiKey = process.env.GEMINI_API_KEY;
 
-    return res.json({ counterargument });
+    if (!apiKey) {
+      return res.json({
+        counterargument: fallbackCounterargument(label, summary),
+        source: 'fallback',
+      });
+    }
+
+    try {
+      const counterargument = await generateCounterargument(apiKey, label, summary);
+      return res.json({ counterargument, source: 'ai' });
+    } catch (innerError) {
+      console.error(
+        '[counterpoint] ai generation failed, using fallback',
+        innerError instanceof Error ? innerError.message : innerError
+      );
+
+      return res.json({
+        counterargument: fallbackCounterargument(label, summary),
+        source: 'fallback',
+      });
+    }
   } catch (error) {
     return res.status(500).json({
-      message: 'Failed to generate counterargument',
+      message: 'Failed to generate counterpoint',
       error: error instanceof Error ? error.message : 'unknown error',
     });
   }

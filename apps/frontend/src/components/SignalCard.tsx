@@ -1,5 +1,4 @@
 import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { getNicheColor } from '../utils/niches';
 
 type SignalCardProps = {
@@ -66,6 +65,7 @@ export default function SignalCard({
   niche,
   sourceCount,
   sourceNames = [],
+  imageUrl,
   isBookmarked = false,
   bookmarkLoading = false,
   onToggleBookmark,
@@ -77,7 +77,7 @@ export default function SignalCard({
   const timestamp = formatRelativeTime(createdAt);
 
   return (
-    <article className="group relative flex flex-col w-full overflow-hidden rounded-xl border border-border bg-card transition-all duration-200 hover:border-border/80 hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgba(0,0,0,0.28)]">
+    <article className="group relative flex w-full flex-col overflow-hidden rounded-xl border border-border bg-card transition-all duration-200 hover:-translate-y-0.5 hover:border-accent/25 hover:shadow-[0_8px_24px_rgba(0,0,0,0.24)]">
       <span
         className={`absolute inset-y-0 left-0 z-10 w-[3px] ${palette.leftAccent}`}
         aria-hidden="true"
@@ -85,9 +85,19 @@ export default function SignalCard({
 
       <Link
         to={`/signal/${id}`}
-        className="flex flex-col flex-1 p-5 pl-6"
+        className="flex flex-col flex-1 p-4 pl-5"
         aria-label={`Open signal: ${label ?? id}`}
       >
+        {imageUrl ? (
+          <div className="mb-3 overflow-hidden rounded-lg border border-border/70 bg-input">
+            <img
+              src={imageUrl}
+              alt={label ?? 'Signal preview'}
+              className="h-20 w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            />
+          </div>
+        ) : null}
+
         <header className="mb-3 flex items-center justify-between gap-2">
           <span
             className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide ${palette.chip}`}
@@ -97,7 +107,7 @@ export default function SignalCard({
 
           <div className="flex items-center gap-1.5">
             {velocity > 3 && (
-              <span className="inline-flex items-center gap-1 rounded-md border border-accent/20 bg-accent/8 px-1.5 py-0.5 text-[11px] font-medium text-accent">
+              <span className="inline-flex items-center gap-1 rounded-md border border-accent/30 bg-accent/12 px-1.5 py-0.5 text-[11px] font-semibold text-accent">
                 <IconTrendUp />
                 {velocity}
               </span>
@@ -110,15 +120,15 @@ export default function SignalCard({
           </div>
         </header>
 
-        <h3 className="text-[15px] font-semibold leading-snug tracking-tight text-text">
+        <h3 className="text-[14px] font-semibold leading-snug tracking-tight text-text">
           {label ?? 'Untitled signal'}
         </h3>
 
-        <p className="mt-2 line-clamp-3 text-[13px] leading-relaxed text-muted">
+        <p className="mt-2 line-clamp-2 text-[12px] leading-relaxed text-muted">
           {summary ?? 'No summary available yet.'}
         </p>
 
-        <footer className="mt-4 flex items-center justify-between gap-2">
+        <footer className="mt-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             {visibleSourceNames.map((name) => (
               <span
@@ -134,13 +144,13 @@ export default function SignalCard({
                 +{remainingSources}
               </span>
             )}
-            <span className="text-[11px] text-muted/60 ml-0.5">{sourceCount} sources</span>
+            <span className="ml-0.5 text-[10px] text-muted/60">{sourceCount} sources</span>
           </div>
-          <span className="text-[11px] text-muted/60">{timestamp}</span>
+          <span className="text-[10px] text-muted/60">{timestamp}</span>
         </footer>
       </Link>
 
-      <div className="flex items-center justify-end border-t border-border/60 px-5 py-2 pl-6">
+      <div className="flex items-center justify-end border-t border-border/60 px-4 py-2 pl-5">
         <button
           type="button"
           onClick={(event) => {
@@ -150,7 +160,7 @@ export default function SignalCard({
           }}
           disabled={bookmarkLoading}
           aria-label={isBookmarked ? 'Remove bookmark' : 'Save signal'}
-          className={`inline-flex h-7 w-7 items-center justify-center rounded-md border border-border transition-colors hover:border-accent/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+          className={`inline-flex h-7 w-7 items-center justify-center rounded-md border border-border transition-colors hover:border-accent/45 disabled:cursor-not-allowed disabled:opacity-50 ${
             isBookmarked ? 'text-accent' : 'text-muted hover:text-text'
           }`}
         >

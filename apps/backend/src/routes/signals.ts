@@ -49,11 +49,13 @@ router.get('/signals', async (req, res) => {
   const offset = (page - 1) * limit;
 
   try {
-    const totalResult = await query<{ count: string }>('SELECT COUNT(*)::text AS count FROM signals WHERE status = \'active\'');
+    const totalResult = await query<{ count: string }>(
+      "SELECT COUNT(*)::text AS count FROM signals WHERE COALESCE(status, 'active') = 'active'"
+    );
     const totalItems = Number(totalResult.rows[0]?.count ?? 0);
     const totalPages = Math.max(1, Math.ceil(totalItems / limit));
 
-    const result = await query<SignalRow>(
+    const activeResult = await query<SignalRow>(
       `SELECT id,
               label,
               summary,
@@ -61,15 +63,29 @@ router.get('/signals', async (req, res) => {
               created_at,
               COALESCE(array_length(article_ids, 1), 0)::int AS article_count
        FROM signals
-       WHERE status = 'active'
+       WHERE COALESCE(status, 'active') = 'active'
        ORDER BY velocity DESC, created_at DESC, id DESC
        LIMIT $1
        OFFSET $2`,
       [limit, offset]
     );
 
+    const archivedResult = await query<SignalRow>(
+      `SELECT id,
+              label,
+              summary,
+              velocity,
+              created_at,
+              COALESCE(array_length(article_ids, 1), 0)::int AS article_count
+       FROM signals
+       WHERE status = 'archived'
+       ORDER BY created_at DESC, id DESC
+       LIMIT 18`
+    );
+
     res.json({
-      items: result.rows,
+      items: activeResult.rows,
+      archived_items: archivedResult.rows,
       pagination: {
         page,
         limit,

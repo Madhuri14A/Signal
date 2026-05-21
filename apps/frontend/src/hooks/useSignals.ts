@@ -30,11 +30,20 @@ export type SignalDetail = {
 
 type SignalsResponse = {
   items: Signal[];
+  archived_items?: Signal[];
 };
 
-async function fetchSignals(): Promise<Signal[]> {
+export type SignalsFeed = {
+  active: Signal[];
+  archived: Signal[];
+};
+
+async function fetchSignals(): Promise<SignalsFeed> {
   const { data } = await client.get<SignalsResponse>('/api/signals');
-  return data.items;
+  return {
+    active: data.items,
+    archived: data.archived_items ?? [],
+  };
 }
 
 async function fetchSignalDetail(signalId: number): Promise<SignalDetail> {

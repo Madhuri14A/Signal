@@ -5,6 +5,20 @@ import { useAuth } from '../context/AuthContext';
 import { useSignalDetail } from '../hooks/useSignals';
 import { useSources } from '../hooks/useSources';
 
+type CounterpointSource = 'ai' | 'fallback';
+
+type SavedArticle = {
+  id: number;
+  signalId: number;
+  title: string;
+  url: string;
+  sourceName: string | null;
+  publishedAt: string | null;
+  savedAt: string;
+};
+
+const READ_LATER_KEY = 'signal.read_later.articles';
+
 function formatPublishedDate(value: string | null): string {
   if (!value) {
     return 'Unknown date';
@@ -29,8 +43,19 @@ export default function SignalDetail() {
   const sourcesQuery = useSources();
   const signalId = Number(params.id);
   const [counterargument, setCounterargument] = useState<string | null>(null);
+  const [counterpointSource, setCounterpointSource] = useState<CounterpointSource | null>(null);
   const [loadingBlindspot, setLoadingBlindspot] = useState(false);
   const [blindspotError, setBlindspotError] = useState<string | null>(null);
+  const [savedArticleIds, setSavedArticleIds] = useState<Set<number>>(() => {
+    try {
+      const raw = localStorage.getItem(READ_LATER_KEY);
+      if (!raw) return new Set<number>();
+      const parsed = JSON.parse(raw) as SavedArticle[];
+      return new Set(parsed.map((a) => a.id));
+    } catch {
+      return new Set<number>();
+    }
+  });
 
   const signalQuery = useSignalDetail(signalId);
 
@@ -56,7 +81,7 @@ export default function SignalDetail() {
     setLoadingBlindspot(true);
 
     try {
-      const { data } = await client.post<{ counterargument: string }>(
+      const { data } = await client.post<{ counterargument: string; source?: CounterpointSource }>(
         '/api/blindspot',
         { signalId },
         {
@@ -67,12 +92,49 @@ export default function SignalDetail() {
       );
 
       setCounterargument(data.counterargument);
+      setCounterpointSource(data.source ?? 'ai');
     } catch (error) {
       setBlindspotError(
-        error instanceof Error ? error.message : 'Failed to generate another perspective.'
+        error instanceof Error ? error.message : 'Failed to generate counterpoint.'
       );
     } finally {
       setLoadingBlindspot(false);
+    }
+  };
+
+  const toggleReadLater = (article: {
+    id: number;
+    title: string;
+    url: string;
+    source_name: string | null;
+    published_at: string | null;
+  }) => {
+    if (!Number.isFinite(signalId) || signalId <= 0) return;
+
+    try {
+      const raw = localStorage.getItem(READ_LATER_KEY);
+      const existing = raw ? (JSON.parse(raw) as SavedArticle[]) : [];
+      const has = existing.some((item) => item.id === article.id);
+
+      const next = has
+        ? existing.filter((item) => item.id !== article.id)
+        : [
+            {
+              id: article.id,
+              signalId,
+              title: article.title,
+              url: article.url,
+              sourceName: article.source_name,
+              publishedAt: article.published_at,
+              savedAt: new Date().toISOString(),
+            },
+            ...existing,
+          ];
+
+      localStorage.setItem(READ_LATER_KEY, JSON.stringify(next));
+      setSavedArticleIds(new Set(next.map((item) => item.id)));
+    } catch {
+      // noop
     }
   };
 
@@ -94,6 +156,39 @@ export default function SignalDetail() {
       signal.articles
         .map((article) => (article.source_name ? sourceToNiche.get(article.source_name) : undefined))
         .find((niche): niche is string => Boolean(niche)) ?? 'all';
+
+    const timeline = (() => {
+      const dated = signal.articles
+        .map((article) => article.published_at)
+        .filter((v): v is string => Boolean(v))
+        .map((v) => new Date(v))
+        .filter((d) => !Number.isNaN(d.getTime()))
+        .sort((a, b) => a.getTime() - b.getTime());
+
+      const first = dated[0] ?? null;
+      const last = dated[dated.length - 1] ?? null;
+
+      const byDay = new Map<string, number>();
+      for (const d of dated) {
+        const k = d.toISOString().slice(0, 10);
+        byDay.set(k, (byDay.get(k) ?? 0) + 1);
+      }
+      const peak = [...byDay.entries()].sort((a, b) => b[1] - a[1])[0] ?? null;
+
+      const uniqueSources = new Set(
+        signal.articles
+          .map((a) => a.source_name?.trim())
+          .filter((name): name is string => Boolean(name))
+      ).size;
+
+      return {
+        first,
+        last,
+        peak,
+        created: signal.created_at ? new Date(signal.created_at) : null,
+        uniqueSources,
+      };
+    })();
 
     return (
       <>
@@ -120,41 +215,91 @@ export default function SignalDetail() {
             disabled={loadingBlindspot || !token}
             className="mt-6 rounded-xl border border-accent px-4 py-2.5 text-sm font-medium text-accent transition hover:bg-accent/10 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loadingBlindspot ? 'Finding perspective...' : 'Blind Spot'}
+            {loadingBlindspot ? 'Generating counterpoint...' : 'Counterpoint'}
           </button>
 
           {blindspotError && <p className="mt-3 text-sm text-red-400">{blindspotError}</p>}
 
           {counterargument && (
             <div className="mt-5 rounded-xl border border-accent/35 bg-accent/10 p-4">
-              <p className="mb-2 text-xs uppercase tracking-wide text-accent">🧠 Another perspective</p>
+              <p className="mb-2 text-xs uppercase tracking-wide text-accent">Counterpoint</p>
               <p className="text-sm text-accent-text">{counterargument}</p>
+              {counterpointSource === 'fallback' && (
+                <p className="mt-2 text-xs text-accent/85">AI unavailable right now. Showing a safe fallback perspective.</p>
+              )}
             </div>
           )}
         </header>
 
-        <section className="mt-6 rounded-3xl border border-border bg-card p-6 sm:p-8">
-          <h2 className="mb-4 text-xl font-semibold text-text">Articles</h2>
-          <ul className="space-y-4">
+        <section className="mt-6 rounded-3xl border border-border bg-card p-5 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold text-text">Signal Timeline</h2>
+          <ol className="space-y-3">
+            {timeline.first && (
+              <li className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm text-muted">
+                <span className="font-medium text-text">{formatPublishedDate(timeline.first.toISOString())}</span> — First related article appears.
+              </li>
+            )}
+            {timeline.created && (
+              <li className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm text-muted">
+                <span className="font-medium text-text">{formatPublishedDate(timeline.created.toISOString())}</span> — Signal detected ({timeline.uniqueSources} sources).
+              </li>
+            )}
+            {timeline.peak && (
+              <li className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm text-muted">
+                <span className="font-medium text-text">{formatPublishedDate(`${timeline.peak[0]}T00:00:00Z`)}</span> — Peak coverage ({timeline.peak[1]} articles in a day).
+              </li>
+            )}
+            {timeline.last && (
+              <li className="rounded-lg border border-border/70 bg-background px-3 py-2 text-sm text-muted">
+                <span className="font-medium text-text">{formatPublishedDate(timeline.last.toISOString())}</span> — Latest mention in this cluster.
+              </li>
+            )}
+          </ol>
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-border bg-card p-5 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold text-text">Related Articles</h2>
+          <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {signal.articles.map((article) => (
-              <li key={article.id} className="overflow-hidden rounded-2xl border border-border bg-background">
+              <li key={article.id} className="overflow-hidden rounded-xl border border-border bg-background">
                 {article.image_url && (
-                  <img src={article.image_url} alt={article.title} className="aspect-video w-full object-cover" />
+                  <img src={article.image_url} alt={article.title} className="h-32 w-full object-cover" />
                 )}
-                <div className="p-4">
+                <div className="p-3.5">
                   <a
                     href={article.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="group inline-flex items-center gap-2 text-text hover:text-accent"
+                    onClick={() => {
+                      try {
+                        const key = 'signal.read_history.article_ids';
+                        const existing = JSON.parse(localStorage.getItem(key) ?? '[]') as number[];
+                        const next = [article.id, ...existing.filter((id) => id !== article.id)].slice(0, 300);
+                        localStorage.setItem(key, JSON.stringify(next));
+                      } catch {
+                        // noop
+                      }
+                    }}
+                    className="group line-clamp-2 inline-flex items-start gap-2 text-sm font-medium leading-snug text-text hover:text-accent"
                   >
                     <span>{article.title}</span>
-                    <span className="text-xs opacity-80 transition group-hover:opacity-100">↗</span>
+                    <span className="mt-0.5 text-[10px] opacity-80 transition group-hover:opacity-100">↗</span>
                   </a>
-                  <div className="mt-2">
-                    <small className="text-muted">
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <small className="text-xs text-muted">
                       {article.source_name ?? 'Unknown source'} • {formatPublishedDate(article.published_at)}
                     </small>
+                    <button
+                      type="button"
+                      onClick={() => toggleReadLater(article)}
+                      className={`rounded-md border px-2 py-1 text-[11px] font-medium transition ${
+                        savedArticleIds.has(article.id)
+                          ? 'border-accent/40 bg-accent/10 text-accent'
+                          : 'border-border text-muted hover:text-text'
+                      }`}
+                    >
+                      {savedArticleIds.has(article.id) ? 'Saved' : 'Read later'}
+                    </button>
                   </div>
                 </div>
               </li>
@@ -166,8 +311,10 @@ export default function SignalDetail() {
   }, [
     blindspotError,
     counterargument,
+    counterpointSource,
     handleGenerateBlindspot,
     loadingBlindspot,
+    savedArticleIds,
     sourceToNiche,
     signalQuery.data,
     signalQuery.isError,

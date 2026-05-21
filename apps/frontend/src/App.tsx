@@ -18,7 +18,7 @@ import Profile from './pages/Profile';
 import Register from './pages/Register';
 import SignalDetail from './pages/SignalDetail';
 
-const NICHE_ORDER = ['all', 'ai', 'webdev', 'devtools', 'startup', 'security', 'data'] as const;
+const NICHE_ORDER = ['all', 'ai', 'webdev', 'devtools', 'startup', 'security', 'data', 'systems', 'mobile', 'opensource', 'career'] as const;
 
 function signalMatchesNiche(
   signal: SignalDetailData,
@@ -60,7 +60,9 @@ function SignalFeedPage() {
   const sourcesQuery = useSources();
   const bookmarksQuery = useBookmarks(token);
 
-  const signalIds = (signalsQuery.data ?? []).map((s) => s.id);
+  const activeSignalList = signalsQuery.data?.active ?? [];
+  const archivedSignalList = signalsQuery.data?.archived ?? [];
+  const signalIds = [...activeSignalList, ...archivedSignalList].map((s) => s.id);
 
   const detailQueries = useQueries({
     queries: signalIds.map((signalId) => ({
@@ -104,8 +106,24 @@ function SignalFeedPage() {
     return new Map(details.map((detail) => [detail.id, detail]));
   }, [details]);
 
-  const filteredSignals = useMemo(() => {
-    const nicheFiltered = details.filter((signal) =>
+  const activeDetails = useMemo(
+    () =>
+      activeSignalList
+        .map((signal) => detailById.get(signal.id))
+        .filter((detail): detail is SignalDetailData => Boolean(detail)),
+    [activeSignalList, detailById]
+  );
+
+  const archivedDetails = useMemo(
+    () =>
+      archivedSignalList
+        .map((signal) => detailById.get(signal.id))
+        .filter((detail): detail is SignalDetailData => Boolean(detail)),
+    [archivedSignalList, detailById]
+  );
+
+  const filterDetailedSignals = (items: SignalDetailData[]) => {
+    const nicheFiltered = items.filter((signal) =>
       signalMatchesNiche(signal, selectedNiche, sourceToNiche)
     );
 
@@ -119,7 +137,17 @@ function SignalFeedPage() {
       const summary = signal.summary?.toLowerCase() ?? '';
       return label.includes(q) || summary.includes(q);
     });
-  }, [details, selectedNiche, sourceToNiche, searchText]);
+  };
+
+  const filteredActiveSignals = useMemo(
+    () => filterDetailedSignals(activeDetails),
+    [activeDetails, selectedNiche, sourceToNiche, searchText]
+  );
+
+  const filteredArchivedSignals = useMemo(
+    () => filterDetailedSignals(archivedDetails),
+    [archivedDetails, selectedNiche, sourceToNiche, searchText]
+  );
 
   const filteredSavedSignals = useMemo(() => {
     const q = searchText.trim().toLowerCase();
@@ -136,26 +164,7 @@ function SignalFeedPage() {
     });
   }, [bookmarksQuery.data, searchText]);
 
-  const visualSignals = useMemo(() => {
-    return filteredSignals.filter((signal) =>
-      signal.articles.some((article) => Boolean(article.image_url))
-    );
-  }, [filteredSignals]);
-
-  const visualSavedSignals = useMemo(() => {
-    return filteredSavedSignals.filter((signal) => {
-      const detail = detailById.get(signal.id);
-      return Boolean(detail?.articles.some((article) => Boolean(article.image_url)));
-    });
-  }, [detailById, filteredSavedSignals]);
-
-  const displaySignals = useMemo(() => {
-    return visualSignals.length > 0 ? visualSignals : filteredSignals;
-  }, [filteredSignals, visualSignals]);
-
-  const displaySavedSignals = useMemo(() => {
-    return visualSavedSignals.length > 0 ? visualSavedSignals : filteredSavedSignals;
-  }, [filteredSavedSignals, visualSavedSignals]);
+  const displaySavedSignals = filteredSavedSignals;
 
   const bookmarkedSignalIds = useMemo(() => {
     return new Set((bookmarksQuery.data ?? []).map((signal) => signal.id));
@@ -207,7 +216,55 @@ function SignalFeedPage() {
   const isLoading = showingSaved ? bookmarksQuery.isLoading : isAllLoading;
   const isError = showingSaved ? bookmarksQuery.isError : isAllError;
 
-  const activeListCount = showingSaved ? displaySavedSignals.length : displaySignals.length;
+  const activeListCount = showingSaved ? displaySavedSignals.length : filteredActiveSignals.length;
+
+  const renderSignalGrid = (items: SignalDetailData[]) => (
+    <motion.section
+      className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+      initial="hidden"
+      animate="visible"
+      variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+    >
+      {items.map((signal) => {
+        const sourceCount = new Set(
+          signal.articles
+            .map((article) => article.source_name)
+            .filter((name): name is string => Boolean(name))
+        ).size;
+        const sourceNames = [
+          ...new Set(
+            signal.articles
+              .map((article) => article.source_name?.trim())
+              .filter((name): name is string => Boolean(name))
+          ),
+        ];
+        const imageUrl = signal.articles.find((article) => article.image_url)?.image_url;
+
+        return (
+          <motion.div
+            key={signal.id}
+            variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+          >
+            <SignalCard
+              id={signal.id}
+              label={signal.label}
+              summary={signal.summary}
+              velocity={signal.velocity}
+              createdAt={signal.created_at}
+              niche={resolveSignalNiche(signal, sourceToNiche)}
+              sourceCount={sourceCount}
+              sourceNames={sourceNames}
+              imageUrl={imageUrl}
+              isBookmarked={bookmarkedSignalIds.has(signal.id)}
+              bookmarkLoading={toggleBookmarkMutation.isPending}
+              onToggleBookmark={handleToggleBookmark}
+            />
+          </motion.div>
+        );
+      })}
+    </motion.section>
+  );
 
   return (
     <Layout niches={niches} selectedNiche={selectedNiche} onChangeNiche={setSelectedNiche}>
@@ -217,14 +274,17 @@ function SignalFeedPage() {
             key={tab}
             type="button"
             onClick={() => setActiveTab(tab)}
-            className="relative pb-1 text-sm font-medium capitalize transition-colors"
-            style={{ color: activeTab === tab ? 'var(--color-text)' : 'var(--color-muted)' }}
+            className={`relative rounded-full border px-4 py-1.5 text-sm font-semibold capitalize transition-all focus:outline-none focus:ring-2 focus:ring-accent/35 ${
+              activeTab === tab
+                ? 'border-accent bg-accent text-background'
+                : 'border-border bg-card text-muted hover:border-accent/30 hover:text-text'
+            }`}
           >
             {tab}
             {activeTab === tab && (
               <motion.span
                 layoutId="feed-tab-underline"
-                className="absolute bottom-0 left-0 right-0 h-px bg-accent"
+                className="absolute -bottom-1 left-3 right-3 h-px bg-accent"
                 transition={{ type: 'spring', stiffness: 500, damping: 40 }}
               />
             )}
@@ -238,14 +298,17 @@ function SignalFeedPage() {
           value={searchText}
           onChange={(e) => setSearchText(e.target.value)}
           placeholder="Search signals..."
-          className="w-full rounded-lg border border-border bg-input px-4 py-2.5 text-sm text-text placeholder:text-muted outline-none transition focus:border-border focus:ring-1 focus:ring-border"
+          className="w-full rounded-xl border border-border bg-input px-4 py-2.5 text-sm text-text placeholder:text-muted outline-none transition focus:border-accent/55 focus:ring-2 focus:ring-accent/20"
           aria-label="Search signals"
         />
       </div>
 
       <div className="mb-6">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted">Signals this week</p>
-        <p className="mt-1 text-3xl font-semibold text-text">{activeListCount}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Signals this week</p>
+        <p className="mt-1 text-3xl font-semibold text-text">
+          {activeListCount}
+          <span className="ml-2 inline-block h-2 w-2 rounded-full bg-accent align-middle" />
+        </p>
       </div>
 
       {isLoading && (
@@ -262,33 +325,33 @@ function SignalFeedPage() {
         <EmptyState message="Try switching to All, or check back soon." />
       )}
 
-      {!isLoading && !isError && activeListCount > 0 && (
-        <motion.section
-          className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
-          initial="hidden"
-          animate="visible"
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
-        >
-          {showingSaved
-            ? displaySavedSignals.map((signal) => {
-                const detail = detailById.get(signal.id);
-                const sourceNames = detail
-                  ? [
-                      ...new Set(
-                        detail.articles
-                          .map((article) => article.source_name?.trim())
-                          .filter((name): name is string => Boolean(name))
-                      ),
-                    ]
-                  : [];
-                const imageUrl = detail?.articles.find((article) => article.image_url)?.image_url;
+      {!isLoading && !isError && activeListCount > 0 &&
+        (showingSaved ? (
+          <motion.section
+            className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+            initial="hidden"
+            animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+          >
+            {displaySavedSignals.map((signal) => {
+              const detail = detailById.get(signal.id);
+              const sourceNames = detail
+                ? [
+                    ...new Set(
+                      detail.articles
+                        .map((article) => article.source_name?.trim())
+                        .filter((name): name is string => Boolean(name))
+                    ),
+                  ]
+                : [];
+              const imageUrl = detail?.articles.find((article) => article.image_url)?.image_url;
 
-                return (
-                  <motion.div
-                    key={signal.id}
-                    variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
-                    transition={{ duration: 0.22, ease: 'easeOut' }}
-                  >
+              return (
+                <motion.div
+                  key={signal.id}
+                  variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+                  transition={{ duration: 0.22, ease: 'easeOut' }}
+                >
                   <SignalCard
                     id={signal.id}
                     label={signal.label}
@@ -303,49 +366,25 @@ function SignalFeedPage() {
                     bookmarkLoading={toggleBookmarkMutation.isPending}
                     onToggleBookmark={handleToggleBookmark}
                   />
-                  </motion.div>
-                );
-              })
-            : displaySignals.map((signal) => {
-                const sourceCount = new Set(
-                  signal.articles
-                    .map((article) => article.source_name)
-                    .filter((name): name is string => Boolean(name))
-                ).size;
-                const sourceNames = [
-                  ...new Set(
-                    signal.articles
-                      .map((article) => article.source_name?.trim())
-                      .filter((name): name is string => Boolean(name))
-                  ),
-                ];
-                const imageUrl = signal.articles.find((article) => article.image_url)?.image_url;
+                </motion.div>
+              );
+            })}
+          </motion.section>
+        ) : (
+          <>
+            {renderSignalGrid(filteredActiveSignals)}
 
-                return (
-                  <motion.div
-                    key={signal.id}
-                    variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
-                    transition={{ duration: 0.22, ease: 'easeOut' }}
-                  >
-                  <SignalCard
-                    id={signal.id}
-                    label={signal.label}
-                    summary={signal.summary}
-                    velocity={signal.velocity}
-                    createdAt={signal.created_at}
-                    niche={resolveSignalNiche(signal, sourceToNiche)}
-                    sourceCount={sourceCount}
-                    sourceNames={sourceNames}
-                    imageUrl={imageUrl}
-                    isBookmarked={bookmarkedSignalIds.has(signal.id)}
-                    bookmarkLoading={toggleBookmarkMutation.isPending}
-                    onToggleBookmark={handleToggleBookmark}
-                  />
-                  </motion.div>
-                );
-              })}
-        </motion.section>
-      )}
+            {filteredArchivedSignals.length > 0 && (
+              <section className="mt-10">
+                <h2 className="mb-4 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-muted">
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                  Previously trending
+                </h2>
+                {renderSignalGrid(filteredArchivedSignals)}
+              </section>
+            )}
+          </>
+        ))}
     </Layout>
   );
 }
@@ -363,6 +402,14 @@ export default function App() {
       />
       <Route
         path="/signal/:id"
+        element={
+          <ProtectedRoute>
+            <SignalDetail />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/s/:id"
         element={
           <ProtectedRoute>
             <SignalDetail />

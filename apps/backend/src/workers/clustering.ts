@@ -7,8 +7,21 @@ type ArticleRow = {
 
 const SIMILARITY_THRESHOLD = 0.75;
 const COSINE_DISTANCE_THRESHOLD = 1 - SIMILARITY_THRESHOLD;
-const MIN_CLUSTER_SIZE = 3;
 const LABEL_SIMILARITY_THRESHOLD = 0.8;
+
+const DEFAULT_MIN_CLUSTER_SIZE = 3;
+const MIN_CLUSTER_SIZE_BY_NICHE: Record<string, number> = {
+  ai: 3,
+  security: 3,
+  devtools: 2,
+  systems: 2,
+  mobile: 2,
+};
+
+function getMinClusterSizeForNiche(niche: string | null): number {
+  const key = niche?.trim().toLowerCase() ?? 'general';
+  return MIN_CLUSTER_SIZE_BY_NICHE[key] ?? DEFAULT_MIN_CLUSTER_SIZE;
+}
 
 class UnionFind {
   private parent = new Map<number, number>();
@@ -223,10 +236,15 @@ export async function runClustering() {
 
   const clusters = uf
     .groups()
-    .filter((cluster) => cluster.length >= MIN_CLUSTER_SIZE)
+    .filter((cluster) => {
+      const sampleId = cluster[0];
+      const niche = nicheById.get(sampleId) ?? null;
+      const minClusterSize = getMinClusterSizeForNiche(niche);
+      return cluster.length >= minClusterSize;
+    })
     .sort((a, b) => b.length - a.length);
 
-  console.log(`clusters detected (size >= ${MIN_CLUSTER_SIZE}): ${clusters.length}`);
+  console.log(`clusters detected (niche-based minimum): ${clusters.length}`);
 
   let inserted = 0;
   const runKeys = new Set<string>();
