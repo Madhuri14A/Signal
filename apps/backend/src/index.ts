@@ -13,6 +13,7 @@ import blindspotRouter from './routes/blindspot';
 import bookmarksRouter from './routes/bookmarks';
 import signalsRouter from './routes/signals';
 import sourcesRouter from './routes/sources';
+import { startScheduler } from './scheduler';
 
 dotenv.config();
 const env = loadEnvOrExit();
@@ -122,6 +123,11 @@ async function startServer() {
 
     server = app.listen(PORT, () => {
       console.log(`signal backend running on http://localhost:${PORT}`);
+        try {
+          startScheduler();
+        } catch (err) {
+          console.error('failed to start scheduler', err);
+        }
     });
   } catch (error) {
     console.error('failed to connect to database', error);

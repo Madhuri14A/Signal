@@ -18,7 +18,7 @@ type EmbedderCheckpoint = {
 
 const BATCH_SIZE = 20;
 const BATCH_DELAY_MS = 2000;
-const MIN_WORD_COUNT = 500;
+const MIN_WORD_COUNT = 300;
 const CHECKPOINT_FILE = path.resolve(process.cwd(), 'embedder-checkpoint.json');
 const PRIMARY_GEMINI_MODEL = process.env.GEMINI_EMBED_MODEL || 'models/gemini-embedding-001';
 const FALLBACK_GEMINI_MODEL = 'models/text-embedding-004';

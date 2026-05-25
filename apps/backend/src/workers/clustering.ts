@@ -9,7 +9,7 @@ const SIMILARITY_THRESHOLD = 0.75;
 const COSINE_DISTANCE_THRESHOLD = 1 - SIMILARITY_THRESHOLD;
 const LABEL_SIMILARITY_THRESHOLD = 0.8;
 
-const DEFAULT_MIN_CLUSTER_SIZE = 3;
+const DEFAULT_MIN_CLUSTER_SIZE = 2;
 const MIN_CLUSTER_SIZE_BY_NICHE: Record<string, number> = {
   ai: 3,
   security: 3,
@@ -77,8 +77,8 @@ async function fetchEmbeddedArticles(): Promise<ArticleRow[]> {
             s.niche
      FROM articles a
      INNER JOIN sources s ON s.id = a.source_id
-     WHERE embedding IS NOT NULL
-       AND quality_score >= 2
+    WHERE embedding IS NOT NULL
+      AND quality_score >= 1
      ORDER BY a.id ASC`
   );
 

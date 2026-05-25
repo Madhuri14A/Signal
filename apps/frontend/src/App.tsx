@@ -218,7 +218,7 @@ function SignalFeedPage() {
 
   const activeListCount = showingSaved ? displaySavedSignals.length : filteredActiveSignals.length;
 
-  const renderSignalGrid = (items: SignalDetailData[]) => (
+  const renderSignalGrid = (items: SignalDetailData[], isArchived = false) => (
     <motion.section
       className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
       initial="hidden"
@@ -259,6 +259,7 @@ function SignalFeedPage() {
               isBookmarked={bookmarkedSignalIds.has(signal.id)}
               bookmarkLoading={toggleBookmarkMutation.isPending}
               onToggleBookmark={handleToggleBookmark}
+              isArchived={isArchived}
             />
           </motion.div>
         );
@@ -322,7 +323,20 @@ function SignalFeedPage() {
       {isError && <ErrorMessage />}
 
       {!isLoading && !isError && activeListCount === 0 && (
-        <EmptyState message="Try switching to All, or check back soon." />
+        // If there are archived signals for this niche, surface them with an "older signal" badge.
+        filteredArchivedSignals.length > 0 ? (
+          <>
+            <section>
+              <h2 className="mb-4 inline-flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.16em] text-muted">
+                <span className="h-1.5 w-1.5 rounded-full bg-muted/40" />
+                Older signals
+              </h2>
+              {renderSignalGrid(filteredArchivedSignals, true)}
+            </section>
+          </>
+        ) : (
+          <EmptyState message="Try switching to All, or check back soon." />
+        )
       )}
 
       {!isLoading && !isError && activeListCount > 0 &&

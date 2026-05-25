@@ -27,7 +27,7 @@ type FeedItem = {
 
 const parser = new Parser<Record<string, never>, FeedItem>();
 const FRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-const MIN_WORD_COUNT = 500;
+const MIN_WORD_COUNT = 300;
 
 const NOISE_TITLE_PATTERN = /\b(release|v\d+\.|changelog|fix|bug|patch)\b/i;
 const THOUGHTFUL_TITLE_PATTERN = /\b(why|how|future|thoughts|notes on|essay)\b/i;

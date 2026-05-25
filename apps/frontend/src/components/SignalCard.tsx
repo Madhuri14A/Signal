@@ -14,6 +14,7 @@ type SignalCardProps = {
   isBookmarked?: boolean;
   bookmarkLoading?: boolean;
   onToggleBookmark?: (signalId: number) => void;
+  isArchived?: boolean;
 };
 
 function getInitials(name: string): string {
@@ -104,6 +105,13 @@ export default function SignalCard({
           >
             {niche}
           </span>
+
+          {/** Older/archived badge */}
+          {isArchived && (
+            <div className="flex items-center gap-1">
+              <span className="inline-flex items-center rounded-md bg-muted/10 px-2 py-0.5 text-[11px] font-medium text-muted border border-border">older signal</span>
+            </div>
+          )}
 
           <div className="flex items-center gap-1.5">
             {velocity > 3 && (
