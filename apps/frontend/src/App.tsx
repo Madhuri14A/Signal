@@ -408,36 +408,11 @@ export default function App() {
     <Routes>
       <Route
         path="/"
-        element={
-          <ProtectedRoute>
-            <SignalFeedPage />
-          </ProtectedRoute>
-        }
+        element={<SignalFeedPage />}
       />
-      <Route
-        path="/signal/:id"
-        element={
-          <ProtectedRoute>
-            <SignalDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/s/:id"
-        element={
-          <ProtectedRoute>
-            <SignalDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/signals/:id"
-        element={
-          <ProtectedRoute>
-            <SignalDetail />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/signal/:id" element={<SignalDetail />} />
+      <Route path="/s/:id" element={<SignalDetail />} />
+      <Route path="/signals/:id" element={<SignalDetail />} />
       <Route path="/login" element={<Login />} />
       <Route
         path="/profile"

@@ -270,7 +270,13 @@ export default function SignalDetail() {
                     href={article.url}
                     target="_blank"
                     rel="noreferrer"
-                    onClick={() => {
+                    onClick={(e) => {
+                      if (!token) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        navigate('/login', { state: { from: `/signal/${signalId}` } });
+                        return;
+                      }
                       try {
                         const key = 'signal.read_history.article_ids';
                         const existing = JSON.parse(localStorage.getItem(key) ?? '[]') as number[];

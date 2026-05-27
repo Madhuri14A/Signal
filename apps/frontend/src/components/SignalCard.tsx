@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import { getNicheColor } from '../utils/niches';
 
 type SignalCardProps = {
@@ -72,6 +73,8 @@ export default function SignalCard({
   onToggleBookmark,
   isArchived = false,
 }: SignalCardProps) {
+  const { token } = useAuth();
+  const navigate = useNavigate();
   const rising = isRising(createdAt);
   const palette = getNicheColor(niche);
   const visibleSourceNames = sourceNames.slice(0, 3);
@@ -165,6 +168,10 @@ export default function SignalCard({
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (!token) {
+              navigate('/login', { state: { from: `/signal/${id}` } });
+              return;
+            }
             onToggleBookmark?.(id);
           }}
           disabled={bookmarkLoading}
