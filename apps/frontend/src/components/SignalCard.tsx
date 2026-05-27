@@ -70,6 +70,7 @@ export default function SignalCard({
   isBookmarked = false,
   bookmarkLoading = false,
   onToggleBookmark,
+  isArchived = false,
 }: SignalCardProps) {
   const rising = isRising(createdAt);
   const palette = getNicheColor(niche);
