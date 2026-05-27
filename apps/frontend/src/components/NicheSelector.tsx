@@ -14,22 +14,19 @@ export default function NicheSelector({ niches, selectedNiche, onChange }: Niche
   }
 
   return (
-    <div aria-label="Filter by niche" className="w-full">
-      <label htmlFor="niche-select" className="sr-only">
-        Select niche
-      </label>
-      <select
-        id="niche-select"
-        value={selectedNiche}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-xl border border-border bg-input px-4 py-2.5 text-sm text-text focus:outline-none focus:ring-2 focus:ring-accent/30"
-      >
-        {niches.map((niche) => (
-          <option key={niche} value={niche}>
-            {formatLabel(niche)}
-          </option>
-        ))}
-      </select>
+    <div aria-label="Filter by niche" className="niche-selector w-full">
+      {niches.map((niche) => (
+        <button
+          key={niche}
+          type="button"
+          className={
+            selectedNiche === niche ? 'pill pill-selected' : 'pill'
+          }
+          onClick={() => onChange(niche)}
+        >
+          {formatLabel(niche)}
+        </button>
+      ))}
     </div>
   );
 }

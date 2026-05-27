@@ -32,6 +32,15 @@ type SourceRow = {
   created_at: string;
 };
 
+type DailyReadRow = {
+  title: string;
+  url: string;
+  source_name: string | null;
+  image_url: string | null;
+  published_at: string | null;
+  niche: string;
+};
+
 const router = Router();
 
 function toPositiveInt(value: unknown, fallback: number): number {
@@ -158,6 +167,53 @@ router.get('/signals/:id', async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       message: 'Failed to fetch signal detail',
+      error: error instanceof Error ? error.message : 'unknown error',
+    });
+  }
+});
+
+router.get('/daily-reads', async (_req, res) => {
+  try {
+    const result = await query<DailyReadRow>(
+      `SELECT title,
+              url,
+              source_name,
+              image_url,
+              published_at,
+              niche
+       FROM (
+         SELECT a.title,
+                a.url,
+                src.name AS source_name,
+                a.image_url,
+                a.published_at,
+                COALESCE(src.niche, 'general') AS niche,
+                a.quality_score,
+                (a.published_at >= NOW() - INTERVAL '24 hours')::int AS fresh24h,
+                ROW_NUMBER() OVER (
+                  PARTITION BY COALESCE(src.niche, 'general')
+                  ORDER BY (a.published_at >= NOW() - INTERVAL '24 hours')::int DESC,
+                           a.quality_score DESC NULLS LAST,
+                           a.published_at DESC NULLS LAST,
+                           a.id DESC
+                ) AS row_rank
+         FROM articles a
+         INNER JOIN sources src ON src.id = a.source_id
+         WHERE a.published_at >= NOW() - INTERVAL '48 hours'
+           AND NOT EXISTS (
+             SELECT 1
+             FROM signals s
+             WHERE a.id = ANY(s.article_ids)
+           )
+       ) sub
+       WHERE row_rank = 1
+       ORDER BY niche ASC`
+    );
+
+    res.json({ items: result.rows });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Failed to fetch daily reads',
       error: error instanceof Error ? error.message : 'unknown error',
     });
   }

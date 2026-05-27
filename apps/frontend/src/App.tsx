@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import EmptyState from './components/EmptyState';
 import ErrorMessage from './components/ErrorMessage';
@@ -17,6 +17,15 @@ import Login from './pages/Login';
 import Profile from './pages/Profile';
 import Register from './pages/Register';
 import SignalDetail from './pages/SignalDetail';
+
+type DailyReadItem = {
+  title: string;
+  url: string;
+  source_name: string | null;
+  image_url: string | null;
+  published_at: string | null;
+  niche: string;
+};
 
 const NICHE_ORDER = ['all', 'ai', 'webdev', 'devtools', 'startup', 'security', 'data', 'systems', 'mobile', 'opensource', 'career'] as const;
 
@@ -55,10 +64,18 @@ function SignalFeedPage() {
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<'all' | 'saved'>('all');
   const [selectedNiche, setSelectedNiche] = useState<string>('all');
-  const [searchText, setSearchText] = useState<string>('');
   const signalsQuery = useSignals();
   const sourcesQuery = useSources();
   const bookmarksQuery = useBookmarks(token);
+
+  const dailyReadsQuery = useQuery<DailyReadItem[]>({
+    queryKey: ['dailyReads'],
+    queryFn: async () => {
+      const { data } = await client.get<{ items: DailyReadItem[] }>('/api/daily-reads');
+      return data.items;
+    },
+    staleTime: 1000 * 60 * 10,
+  });
 
   const activeSignalList = signalsQuery.data?.active ?? [];
   const archivedSignalList = signalsQuery.data?.archived ?? [];
@@ -123,46 +140,20 @@ function SignalFeedPage() {
   );
 
   const filterDetailedSignals = (items: SignalDetailData[]) => {
-    const nicheFiltered = items.filter((signal) =>
-      signalMatchesNiche(signal, selectedNiche, sourceToNiche)
-    );
-
-    const q = searchText.trim().toLowerCase();
-    if (!q) {
-      return nicheFiltered;
-    }
-
-    return nicheFiltered.filter((signal) => {
-      const label = signal.label?.toLowerCase() ?? '';
-      const summary = signal.summary?.toLowerCase() ?? '';
-      return label.includes(q) || summary.includes(q);
-    });
+    return items.filter((signal) => signalMatchesNiche(signal, selectedNiche, sourceToNiche));
   };
 
   const filteredActiveSignals = useMemo(
     () => filterDetailedSignals(activeDetails),
-    [activeDetails, selectedNiche, sourceToNiche, searchText]
+    [activeDetails, selectedNiche, sourceToNiche]
   );
 
   const filteredArchivedSignals = useMemo(
     () => filterDetailedSignals(archivedDetails),
-    [archivedDetails, selectedNiche, sourceToNiche, searchText]
+    [archivedDetails, selectedNiche, sourceToNiche]
   );
 
-  const filteredSavedSignals = useMemo(() => {
-    const q = searchText.trim().toLowerCase();
-    const items = bookmarksQuery.data ?? [];
-
-    if (!q) {
-      return items;
-    }
-
-    return items.filter((signal) => {
-      const label = signal.label?.toLowerCase() ?? '';
-      const summary = signal.summary?.toLowerCase() ?? '';
-      return label.includes(q) || summary.includes(q);
-    });
-  }, [bookmarksQuery.data, searchText]);
+  const filteredSavedSignals = useMemo(() => bookmarksQuery.data ?? [], [bookmarksQuery.data]);
 
   const displaySavedSignals = filteredSavedSignals;
 
@@ -269,7 +260,7 @@ function SignalFeedPage() {
 
   return (
     <Layout niches={niches} selectedNiche={selectedNiche} onChangeNiche={setSelectedNiche}>
-      <div className="mb-6 flex items-center gap-6">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         {(['all', 'saved'] as const).map((tab) => (
           <button
             key={tab}
@@ -291,17 +282,6 @@ function SignalFeedPage() {
             )}
           </button>
         ))}
-      </div>
-
-      <div className="mb-5">
-        <input
-          type="text"
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          placeholder="Search signals..."
-          className="w-full rounded-xl border border-border bg-input px-4 py-2.5 text-sm text-text placeholder:text-muted outline-none transition focus:border-accent/55 focus:ring-2 focus:ring-accent/20"
-          aria-label="Search signals"
-        />
       </div>
 
       <div className="mb-6">
@@ -399,6 +379,39 @@ function SignalFeedPage() {
             )}
           </>
         ))}
+      {dailyReadsQuery.data && dailyReadsQuery.data.length > 0 && (
+        <>
+          <hr className="my-10 border-t border-border/60" />
+          <section className="mb-6 rounded-3xl border border-border bg-card p-5 sm:p-6">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-accent">Daily reads</p>
+                <h2 className="mt-2 text-xl font-semibold text-text">Fresh picks by niche</h2>
+              </div>
+              {dailyReadsQuery.isLoading && (
+                <p className="text-xs text-muted">Loading...</p>
+              )}
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {dailyReadsQuery.data.map((item) => (
+                <a
+                  key={item.url}
+                  href={item.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="group overflow-hidden rounded-3xl border border-border bg-background p-4 transition hover:border-accent/50 hover:bg-accent/5"
+                >
+                  <p className="text-[11px] uppercase tracking-[0.24em] text-muted">{item.niche}</p>
+                  <h3 className="mt-3 text-sm font-semibold leading-snug text-text line-clamp-3">
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 text-xs text-muted">{item.source_name ?? 'Unknown source'}</p>
+                </a>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
     </Layout>
   );
 }

@@ -40,19 +40,27 @@
 }
 
 .pill {
-  border: 1px solid #cbd5e1;
-  background: white;
+  border: 1px solid var(--color-border);
+  background: var(--color-card);
   border-radius: 9999px;
   padding: 0.45rem 0.85rem;
   font-size: 0.9rem;
   cursor: pointer;
   text-transform: capitalize;
+  color: var(--color-text);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease;
+}
+
+.pill:hover {
+  background: rgba(163, 230, 53, 0.1);
+  border-color: var(--lime);
+  color: var(--lime);
 }
 
 .pill-selected {
-  background: #0f172a;
-  border-color: #0f172a;
-  color: white;
+  background: var(--color-bg);
+  border-color: var(--color-bg);
+  color: var(--color-text);
 }
 
 .signals-grid {
@@ -61,8 +69,8 @@
 }
 
 .signal-card {
-  background: white;
-  border: 1px solid #e2e8f0;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 1rem;
 }
@@ -78,7 +86,7 @@
 
 .signal-card-link:hover .signal-card {
   transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 14px 40px var(--lime-glow);
 }
 
 .signal-card-header {
@@ -104,32 +112,32 @@
   white-space: nowrap;
   font-size: 0.75rem;
   border-radius: 9999px;
-  background: #fff7ed;
-  color: #c2410c;
+  background: var(--lime-glow);
+  color: var(--lime-dark);
   padding: 0.2rem 0.6rem;
 }
 
 .signal-rising {
   font-size: 0.75rem;
   border-radius: 9999px;
-  background: #ecfeff;
-  color: #0e7490;
+  background: rgba(163, 230, 53, 0.12);
+  color: var(--lime);
   padding: 0.2rem 0.6rem;
 }
 
 .signal-niche-pill {
   font-size: 0.75rem;
   border-radius: 9999px;
-  border: 1px solid #dbeafe;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border: 1px solid var(--color-border);
+  background: var(--color-input);
+  color: var(--color-text);
   padding: 0.2rem 0.6rem;
   text-transform: capitalize;
 }
 
 .signal-card-summary {
   margin: 0.55rem 0 0.8rem;
-  color: #334155;
+  color: var(--color-muted);
 }
 
 .signal-articles-list {
@@ -138,7 +146,7 @@
 }
 
 .signal-article-link {
-  color: #1d4ed8;
+  color: var(--color-accent-hover);
   text-decoration: none;
 }
 

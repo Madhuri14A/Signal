@@ -42,7 +42,7 @@ export default function Layout({ children, niches, selectedNiche, onChangeNiche 
 
   return (
     <main className="min-h-screen bg-background text-text">
-      <header className="sticky top-0 z-20 border-b border-border/60 bg-background/96 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-border/60 bg-background shadow-sm">
         <div className="mx-auto flex w-full max-w-7xl items-center gap-6 px-4 py-4 sm:px-6 lg:px-8">
           <Link to="/" className="flex flex-col leading-none text-text shrink-0" aria-label="Signal home">
             <span className="flex items-center gap-2 text-3xl font-bold tracking-tight sm:text-4xl">
