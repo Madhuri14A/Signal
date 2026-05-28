@@ -141,7 +141,7 @@ export async function runEmbedder() {
         inputType: 'search_document',
       });
 
-      const embeddings = response.embeddings;
+      const embeddings = response.embeddings as number[][];
 
       if (!Array.isArray(embeddings) || embeddings.length !== validArticles.length) {
         throw new Error(`Expected ${validArticles.length} embeddings, got ${embeddings?.length ?? 0}`);
