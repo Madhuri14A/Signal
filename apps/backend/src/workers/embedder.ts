@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
-import axios from 'axios';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { CohereClient } from 'cohere-ai';
 import { pool, query } from '../db';
 
 dotenv.config();
@@ -20,43 +20,13 @@ const BATCH_SIZE = 20;
 const BATCH_DELAY_MS = 2000;
 const MIN_WORD_COUNT = 300;
 const CHECKPOINT_FILE = path.resolve(process.cwd(), 'embedder-checkpoint.json');
-const PRIMARY_GEMINI_MODEL = process.env.GEMINI_EMBED_MODEL || 'models/gemini-embedding-001';
-const FALLBACK_GEMINI_MODEL = 'models/text-embedding-004';
-const USE_LOCAL_EMBEDDINGS = process.env.LOCAL_EMBEDDINGS === 'true';
-
-function isQuotaError(error: unknown): boolean {
-  if (axios.isAxiosError(error)) {
-    if (error.response?.status === 429) {
-      return true;
-    }
-
-    const axiosMessage = (error.response?.data as { error?: { message?: string } })?.error?.message?.toLowerCase() ?? '';
-    return axiosMessage.includes('quota') || axiosMessage.includes('billing') || axiosMessage.includes('resource exhausted');
-  }
-
-  const maybeError = error as { status?: number; message?: string };
-  if (maybeError?.status === 429) {
-    return true;
-  }
-
-  const message = maybeError?.message?.toLowerCase() ?? '';
-  return message.includes('quota') || message.includes('billing') || message.includes('resource exhausted');
-}
-
-function isNotFoundError(error: unknown): boolean {
-  if (axios.isAxiosError(error)) {
-    return error.response?.status === 404;
-  }
-
-  const maybeError = error as { status?: number };
-  return maybeError?.status === 404;
-}
+const COHERE_EMBED_MODEL = 'embed-english-v3.0';
+const EMBEDDING_DIMENSION = 1024;
 
 function buildEmbeddingInput(article: ArticleRow): string {
   const title = article.title?.trim() ?? '';
   const content = article.content?.trim() ?? '';
   const combined = `${title}\n\n${content}`.trim();
-
   return combined.slice(0, 12000);
 }
 
@@ -64,144 +34,12 @@ function toVectorLiteral(values: number[]): string {
   return `[${values.join(',')}]`;
 }
 
-function normalizeVectorLength(values: number[], targetLength: number): number[] {
-  if (values.length === targetLength) {
-    return values;
-  }
-
-  if (values.length > targetLength) {
-    return values.slice(0, targetLength);
-  }
-
-  return [...values, ...new Array(targetLength - values.length).fill(0)];
-}
-
-function stringToSeed(input: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < input.length; i += 1) {
-    h ^= input.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  return h >>> 0;
-}
-
-function seededRandom(seed: number): () => number {
-  let state = seed || 1;
-  return () => {
-    state = (1664525 * state + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-}
-
-function createLocalEmbedding(input: string, dimension: number): number[] {
-  const tokens = input
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .split(/\s+/)
-    .filter((t) => t.length > 2)
-    .slice(0, 500);
-
-  const values = new Array<number>(dimension).fill(0);
-
-  if (tokens.length === 0) {
-    const rand = seededRandom(stringToSeed(input));
-    for (let i = 0; i < dimension; i += 1) {
-      values[i] = rand() * 2 - 1;
-    }
-  } else {
-    for (const token of tokens) {
-      const rand = seededRandom(stringToSeed(token));
-      for (let i = 0; i < dimension; i += 1) {
-        values[i] += rand() * 2 - 1;
-      }
-    }
-  }
-
-  let norm = 0;
-  for (const v of values) {
-    norm += v * v;
-  }
-  norm = Math.sqrt(norm) || 1;
-
-  return values.map((v) => v / norm);
-}
-
-async function getEmbeddingColumnDimension(): Promise<number> {
-  const result = await query<{ type_name: string }>(
-    `SELECT format_type(a.atttypid, a.atttypmod) AS type_name
-     FROM pg_attribute a
-     JOIN pg_class c ON c.oid = a.attrelid
-     JOIN pg_namespace n ON n.oid = c.relnamespace
-     WHERE n.nspname = 'public'
-       AND c.relname = 'articles'
-       AND a.attname = 'embedding'
-       AND a.attnum > 0
-       AND NOT a.attisdropped
-     LIMIT 1`
-  );
-
-  const typeName = result.rows[0]?.type_name ?? '';
-  const match = typeName.match(/vector\((\d+)\)/i);
-  if (!match) {
-    return 1536;
-  }
-
-  return Number(match[1]);
-}
-
-async function createGeminiEmbedding(apiKey: string, input: string): Promise<number[]> {
-  const modelsToTry = [PRIMARY_GEMINI_MODEL, FALLBACK_GEMINI_MODEL];
-  let lastError: unknown;
-
-  for (const model of modelsToTry) {
-    try {
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/${model}:embedContent?key=${apiKey}`,
-        {
-          model,
-          content: {
-            parts: [{ text: input }],
-          },
-        },
-        {
-          timeout: 30000,
-        }
-      );
-
-      const values = (response.data as { embedding?: { values?: number[] } })?.embedding?.values;
-      if (!values || values.length === 0) {
-        throw new Error(`No embedding values returned for model ${model}`);
-      }
-
-      return values;
-    } catch (error) {
-      lastError = error;
-      if (isNotFoundError(error)) {
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  if (axios.isAxiosError(lastError)) {
-    const details = JSON.stringify(lastError.response?.data ?? {});
-    throw new Error(`Gemini embedding model not found. Tried: ${modelsToTry.join(', ')}. Response: ${details}`);
-  }
-
-  throw new Error(`Gemini embedding model not found. Tried: ${modelsToTry.join(', ')}`);
-}
-
 async function readCheckpoint(): Promise<number> {
   try {
     const raw = await fs.readFile(CHECKPOINT_FILE, 'utf8');
     const parsed = JSON.parse(raw) as Partial<EmbedderCheckpoint>;
     const checkpointId = Number(parsed.lastProcessedArticleId);
-
-    if (!Number.isFinite(checkpointId) || checkpointId < 0) {
-      return 0;
-    }
-
+    if (!Number.isFinite(checkpointId) || checkpointId < 0) return 0;
     return checkpointId;
   } catch {
     return 0;
@@ -220,7 +58,10 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function fetchArticlesWithoutEmbedding(limit: number, startAfterId: number): Promise<ArticleRow[]> {
+async function fetchArticlesWithoutEmbedding(
+  limit: number,
+  startAfterId: number
+): Promise<ArticleRow[]> {
   const result = await query<ArticleRow>(
     `SELECT id, title, content
      FROM articles
@@ -231,36 +72,34 @@ async function fetchArticlesWithoutEmbedding(limit: number, startAfterId: number
      LIMIT $1`,
     [limit, MIN_WORD_COUNT, startAfterId]
   );
-
   return result.rows;
 }
 
 async function updateArticleEmbedding(articleId: number, embedding: number[]) {
   const vector = toVectorLiteral(embedding);
-
   await query(
-    `UPDATE articles
-     SET embedding = $2::vector
-     WHERE id = $1`,
+    `UPDATE articles SET embedding = $2::vector WHERE id = $1`,
     [articleId, vector]
   );
 }
 
+function isQuotaError(error: unknown): boolean {
+  const message = (error instanceof Error ? error.message : String(error)).toLowerCase();
+  return message.includes('quota') || message.includes('rate limit') || message.includes('too many requests');
+}
+
 export async function runEmbedder() {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!USE_LOCAL_EMBEDDINGS && !apiKey) {
-    throw new Error('GEMINI_API_KEY is required unless LOCAL_EMBEDDINGS=true');
+  const apiKey = process.env.COHERE_API_KEY;
+  if (!apiKey) {
+    throw new Error('COHERE_API_KEY is required in your .env file');
   }
 
-  const targetVectorLength = await getEmbeddingColumnDimension();
-  let checkpointId = await readCheckpoint();
+  const cohere = new CohereClient({ token: apiKey });
 
-  console.log(`embedding target dimension: ${targetVectorLength}`);
+  let checkpointId = await readCheckpoint();
+  console.log(`embedding model: ${COHERE_EMBED_MODEL} (${EMBEDDING_DIMENSION} dimensions)`);
   console.log(`embedding filter: word_count >= ${MIN_WORD_COUNT}`);
   console.log(`resuming from checkpoint article id: ${checkpointId}`);
-  if (USE_LOCAL_EMBEDDINGS) {
-    console.log('local embedding mode enabled (no billing/API calls)');
-  }
 
   let totalEmbedded = 0;
   let batchNumber = 0;
@@ -268,64 +107,68 @@ export async function runEmbedder() {
 
   while (true) {
     const batch = await fetchArticlesWithoutEmbedding(BATCH_SIZE, checkpointId);
-    if (batch.length === 0) {
-      break;
-    }
+    if (batch.length === 0) break;
 
     batchNumber += 1;
     console.log(`batch ${batchNumber}: processing ${batch.length} articles`);
 
-    for (let i = 0; i < batch.length; i += 1) {
-      if (shouldStop) {
-        break;
-      }
+    // Build inputs for the whole batch
+    const inputs: string[] = [];
+    const validArticles: ArticleRow[] = [];
 
-      const article = batch[i];
+    for (const article of batch) {
       const input = buildEmbeddingInput(article);
-
       if (!input) {
         console.log(`skip article ${article.id}: empty input`);
         continue;
       }
+      inputs.push(input);
+      validArticles.push(article);
+    }
 
-      try {
-        const embedding = USE_LOCAL_EMBEDDINGS
-          ? createLocalEmbedding(input, targetVectorLength)
-          : normalizeVectorLength(await createGeminiEmbedding(apiKey as string, input), targetVectorLength);
+    if (inputs.length === 0) {
+      // All skipped — advance checkpoint to last article id in batch
+      checkpointId = batch[batch.length - 1].id;
+      await writeCheckpoint(checkpointId);
+      continue;
+    }
+
+    try {
+      // Cohere supports batch embedding — send all at once
+      const response = await cohere.embed({
+        texts: inputs,
+        model: COHERE_EMBED_MODEL,
+        inputType: 'search_document',
+      });
+
+      const embeddings = response.embeddings;
+
+      if (!Array.isArray(embeddings) || embeddings.length !== validArticles.length) {
+        throw new Error(`Expected ${validArticles.length} embeddings, got ${embeddings?.length ?? 0}`);
+      }
+
+      for (let i = 0; i < validArticles.length; i++) {
+        const article = validArticles[i];
+        const embedding = embeddings[i] as number[];
 
         await updateArticleEmbedding(article.id, embedding);
         checkpointId = article.id;
         await writeCheckpoint(checkpointId);
         totalEmbedded += 1;
 
-        console.log(
-          `embedded article ${article.id} (${i + 1}/${batch.length} in batch, total ${totalEmbedded})`
-        );
-      } catch (error) {
-        if (isQuotaError(error)) {
-          console.error('Gemini quota exceeded. Stopping embedder early.');
-          console.error('Top up billing/credits, then run `npm run embed` again.');
-          shouldStop = true;
-          break;
-        }
-
-        if (isNotFoundError(error)) {
-          console.error('Gemini embedding endpoint/model returned 404. Stopping early.');
-          console.error('Set GEMINI_EMBED_MODEL in .env (try models/gemini-embedding-001).');
-          shouldStop = true;
-          break;
-        }
-
-        console.error(
-          `failed article ${article.id}`,
-          error instanceof Error ? error.message : error
-        );
+        console.log(`embedded article ${article.id} (${i + 1}/${validArticles.length} in batch, total ${totalEmbedded})`);
+      }
+    } catch (error) {
+      if (isQuotaError(error)) {
+        console.error('Cohere quota/rate limit hit. Stopping embedder early.');
+        console.error('Wait a moment then run `npm run embed` again — checkpoint will resume.');
+        shouldStop = true;
+      } else {
+        console.error('batch failed:', error instanceof Error ? error.message : error);
       }
     }
 
-    if (shouldStop) {
-      break;
-    }
+    if (shouldStop) break;
 
     console.log(`batch ${batchNumber} complete. waiting ${BATCH_DELAY_MS / 1000}s...`);
     await delay(BATCH_DELAY_MS);
