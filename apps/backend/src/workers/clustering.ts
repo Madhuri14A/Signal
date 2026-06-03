@@ -205,6 +205,17 @@ async function insertSignal(articleIds: number[], velocity: number, niche: strin
   );
 }
 
+async function clusterOverlapsExistingSignal(articleIds: number[]): Promise<boolean> {
+  const result = await query<{ overlap_count: number }>(
+    `SELECT COUNT(*)::int AS overlap_count
+     FROM signals
+     WHERE status = 'active'
+       AND article_ids && $1::bigint[]`,
+    [articleIds]
+  );
+  return (result.rows[0]?.overlap_count ?? 0) > 0;
+}
+
 export async function runClustering() {
   const articles = await fetchEmbeddedArticles();
   const ids = articles.map((a) => a.id);
@@ -262,11 +273,11 @@ export async function runClustering() {
       continue;
     }
 
-    const isDuplicate = await labelIsDuplicate(articleIds);
-    if (isDuplicate) {
-      console.log(`skip duplicate label: [${key}]`);
-      continue;
-    }
+    const overlaps = await clusterOverlapsExistingSignal(articleIds);
+if (overlaps) {
+  console.log(`skip overlapping cluster: [${key}]`);
+  continue;
+}
 
     const velocity = await calculateVelocity(articleIds);
     const niche = await getSignalNiche(articleIds);
