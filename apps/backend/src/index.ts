@@ -19,6 +19,7 @@ dotenv.config();
 const env = loadEnvOrExit();
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = env.PORT;
 const FRONTEND_URL = env.FRONTEND_URL;
 const FRONTEND_ORIGIN = new URL(FRONTEND_URL).origin;
