@@ -8,3 +8,5 @@ coverage
 .env
 apps/backend/.env
 apps/frontend/.env
+# runtime checkpoint file for embedder
+apps/backend/embedder-checkpoint.json
