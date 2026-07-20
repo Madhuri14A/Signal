@@ -1,0 +1,12 @@
+# Render cron job configuration example. Add to repo and enable in Render
+# See: https://render.com/docs/cron-jobs or create from Dashboard
+
+cron_jobs:
+  - name: signal-worker-run
+    schedule: "0 * * * *" # hourly at minute 0 (UTC). Adjust as needed.
+    timezone: "UTC"
+    command: "bash /opt/render/project/src/apps/backend/run_workers.sh"
+    env: node
+    # The job will run in the context of the repo root on Render. Ensure
+    # environment variables `DATABASE_URL` and `COHERE_API_KEY` are configured
+    # in Render settings (or set in this job's env vars).
